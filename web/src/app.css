@@ -1,0 +1,389 @@
+@import 'tailwindcss';
+
+@theme {
+	/* Pastel red primary */
+	--color-primary-50: #fdf2f2;
+	--color-primary-100: #fbe3e3;
+	--color-primary-200: #f8c9c9;
+	--color-primary-300: #f4aaaa;
+	--color-primary-400: #f08f8f; /* main */
+	--color-primary-500: #e57373;
+	--color-primary-600: #cf5959;
+	--color-primary-950: #2a1414;
+
+	/* Dark neutrals */
+	--color-ink-950: #0d0d10;
+	--color-ink-900: #141418;
+	--color-ink-850: #1a1a1f;
+	--color-ink-800: #212127;
+	--color-ink-700: #2c2c33;
+	--color-ink-500: #6b6b76;
+	--color-ink-400: #8e8e99;
+	--color-ink-200: #d4d4da;
+	--color-ink-100: #ececf0;
+
+	/* Shadow tint: black on dark, a soft grey on light. */
+	--color-shade: #000000;
+
+	--font-sans:
+		'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue',
+		Arial, sans-serif;
+}
+
+/*
+ * Light mode re-maps the same tokens, so components don't need light/dark
+ * variants. The ink scale flips (950 is always the page background, 100 the
+ * main text), and the light pinks used for text get deeper reds so they stay
+ * readable on white.
+ */
+:root {
+	color-scheme: dark;
+	--dot-grid: rgb(255 255 255 / 0.035);
+}
+
+:root[data-theme='light'] {
+	color-scheme: light;
+	--dot-grid: rgb(0 0 0 / 0.05);
+
+	--color-ink-950: #f6f6f8;
+	--color-ink-900: #ffffff;
+	--color-ink-850: #efeff2;
+	--color-ink-800: #e4e4e9;
+	--color-ink-700: #d2d2d9;
+	--color-ink-500: #80808b;
+	--color-ink-400: #5c5c67;
+	--color-ink-200: #2c2c33;
+	--color-ink-100: #16161a;
+
+	--color-primary-200: #a83b3b;
+	--color-primary-300: #d35f5f;
+
+	--color-shade: #6b6b7a;
+}
+
+html {
+	background-color: var(--color-ink-950);
+	color: var(--color-ink-100);
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+}
+
+::selection {
+	background-color: color-mix(in oklab, var(--color-primary-400) 35%, transparent);
+}
+
+/* Keep Chrome's autofill from painting inputs yellow/white. */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+	-webkit-text-fill-color: var(--color-ink-100);
+	-webkit-box-shadow: 0 0 0 1000px var(--color-ink-900) inset;
+	caret-color: var(--color-ink-100);
+	transition: background-color 9999s;
+}
+
+/* Shared text input style. In the components layer so utilities can override it. */
+@layer components {
+	.field {
+		@apply block h-10 w-full rounded-lg border border-ink-700 bg-ink-950/60 px-3 text-sm text-ink-100 transition outline-none placeholder:text-ink-500 focus:border-primary-400/70 focus:ring-3 focus:ring-primary-400/15;
+	}
+}
+
+/* Scrollable without a visible scrollbar (e.g. tab rows on narrow screens). */
+@utility no-scrollbar {
+	scrollbar-width: none;
+	&::-webkit-scrollbar {
+		display: none;
+	}
+}
+
+/* Divider drawn inside the box so an active-tab underline can sit on top of it without overflowing. */
+@utility tab-row-line {
+	box-shadow: inset 0 -1px 0 var(--color-ink-800);
+}
+
+/*
+ * Category tag colours. Each .tag-<name> sets --tag; .tag-chip turns it into a
+ * tinted pill. Pastel on dark, deeper shades on light so text stays readable.
+ * Keep the names in sync with the server's validColors and $lib/categories.ts.
+ */
+.tag-gray { --tag: #a1a1aa; }
+.tag-red { --tag: #f28b8b; }
+.tag-orange { --tag: #f4a36c; }
+.tag-amber { --tag: #e9c46a; }
+.tag-green { --tag: #7fd1a1; }
+.tag-teal { --tag: #6fcfc4; }
+.tag-blue { --tag: #8ab4f8; }
+.tag-indigo { --tag: #a5a8f5; }
+.tag-purple { --tag: #c49af0; }
+.tag-pink { --tag: #f29ac8; }
+
+:root[data-theme='light'] {
+	.tag-gray { --tag: #5f5f6a; }
+	.tag-red { --tag: #b93838; }
+	.tag-orange { --tag: #b45a14; }
+	.tag-amber { --tag: #8a6400; }
+	.tag-green { --tag: #1f7a45; }
+	.tag-teal { --tag: #0f766e; }
+	.tag-blue { --tag: #2160c4; }
+	.tag-indigo { --tag: #4a4ccf; }
+	.tag-purple { --tag: #7a3fc0; }
+	.tag-pink { --tag: #b4307a; }
+}
+
+@layer components {
+	.tag-chip {
+		color: var(--tag);
+		background-color: color-mix(in oklab, var(--tag) 12%, transparent);
+		border: 1px solid color-mix(in oklab, var(--tag) 30%, transparent);
+	}
+	.tag-dot {
+		background-color: var(--tag);
+	}
+}
+
+/* Staff-only notes in a ticket's conversation: amber card. Pair with .tag-amber and border-dashed. */
+@layer components {
+	.internal-note {
+		border-color: color-mix(in oklab, var(--tag) 45%, transparent);
+		background-color: color-mix(in oklab, var(--tag) 6%, transparent);
+	}
+}
+
+/* Incident tree: urgent tickets (and the incident itself) get a red outline. */
+@layer components {
+	.urgent-card {
+		border-color: var(--color-primary-300);
+		box-shadow: 0 0 0 var(--ring-width, 0px) var(--color-primary-300);
+	}
+}
+
+/*
+ * Workspace backgrounds (chosen by an admin in Lithium settings → Appearance).
+ * --pattern is a faint ink that suits both themes. Keep the names in sync with
+ * $lib/backgrounds.ts and the server's Backgrounds list.
+ */
+:root {
+	--pattern: rgb(255 255 255 / 0.055);
+}
+:root[data-theme='light'] {
+	--pattern: rgb(0 0 0 / 0.07);
+}
+
+@layer components {
+	.app-bg-dots {
+		background-image: radial-gradient(circle at 1px 1px, var(--pattern) 1.2px, transparent 0);
+		background-size: 22px 22px;
+	}
+	.app-bg-grid {
+		background-image:
+			linear-gradient(var(--pattern) 1px, transparent 1px),
+			linear-gradient(90deg, var(--pattern) 1px, transparent 1px);
+		background-size: 32px 32px;
+	}
+	.app-bg-lines {
+		background-image: repeating-linear-gradient(45deg, var(--pattern) 0 1px, transparent 1px 14px);
+	}
+	.app-bg-glow {
+		background-image: radial-gradient(
+			ellipse 70% 45% at 50% -5%,
+			color-mix(in oklab, var(--color-primary-400) 14%, transparent),
+			transparent 70%
+		);
+		background-repeat: no-repeat;
+	}
+	/* Waves are an SVG shape tinted with --pattern, so they follow the theme too. */
+	.app-bg-waves {
+		position: relative;
+		isolation: isolate;
+	}
+	.app-bg-waves::before {
+		content: '';
+		position: absolute;
+		inset: 0;
+		z-index: -1;
+		pointer-events: none;
+		background-color: var(--pattern);
+		mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='28' viewBox='0 0 120 28'%3E%3Cpath d='M0 14c15-9 30-9 45 0s30 9 45 0 30-9 45 0' fill='none' stroke='black' stroke-width='1.4'/%3E%3C/svg%3E")
+			repeat;
+		mask-size: 120px 28px;
+	}
+}
+
+/* Knowledge base article typography. Uses theme tokens, so it suits both themes. */
+@layer components {
+	.kb-prose {
+		color: var(--color-ink-200);
+		font-size: 15px;
+		line-height: 1.75;
+		overflow-wrap: anywhere;
+
+		& > :first-child {
+			margin-top: 0;
+		}
+		& > :last-child {
+			margin-bottom: 0;
+		}
+		& h1,
+		& h2,
+		& h3,
+		& h4 {
+			color: var(--color-ink-100);
+			font-weight: 600;
+			letter-spacing: -0.015em;
+			line-height: 1.3;
+		}
+		& h1 {
+			font-size: 1.75em;
+			margin: 1.6em 0 0.6em;
+		}
+		& h2 {
+			font-size: 1.35em;
+			margin: 1.8em 0 0.6em;
+			padding-bottom: 0.35em;
+			border-bottom: 1px solid var(--color-ink-800);
+		}
+		& h3 {
+			font-size: 1.12em;
+			margin: 1.5em 0 0.5em;
+		}
+		& h4 {
+			font-size: 1em;
+			margin: 1.3em 0 0.4em;
+		}
+		& p,
+		& ul,
+		& ol,
+		& pre,
+		& blockquote,
+		& table,
+		& figure {
+			margin: 0 0 1em;
+		}
+		& ul,
+		& ol {
+			padding-left: 1.4em;
+		}
+		& ul {
+			list-style: disc;
+		}
+		& ol {
+			list-style: decimal;
+		}
+		& li {
+			margin: 0.25em 0;
+		}
+		& li::marker {
+			color: var(--color-ink-500);
+		}
+		& a {
+			color: var(--color-primary-300);
+			text-decoration: underline;
+			text-underline-offset: 2px;
+			text-decoration-color: color-mix(in oklab, var(--color-primary-300) 45%, transparent);
+		}
+		& a:hover {
+			text-decoration-color: currentColor;
+		}
+		& strong {
+			color: var(--color-ink-100);
+			font-weight: 600;
+		}
+		& code {
+			font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+			font-size: 0.86em;
+			background: var(--color-ink-850);
+			border: 1px solid var(--color-ink-800);
+			border-radius: 5px;
+			padding: 0.1em 0.35em;
+			color: var(--color-ink-100);
+		}
+		& pre {
+			background: var(--color-ink-950);
+			border: 1px solid var(--color-ink-800);
+			border-radius: 10px;
+			padding: 0.9em 1.1em;
+			overflow-x: auto;
+			line-height: 1.6;
+		}
+		& pre code {
+			background: none;
+			border: 0;
+			padding: 0;
+			font-size: 0.85em;
+		}
+		& blockquote {
+			border-left: 3px solid var(--color-primary-400);
+			background: color-mix(in oklab, var(--color-primary-400) 6%, transparent);
+			border-radius: 0 8px 8px 0;
+			padding: 0.6em 1em;
+			color: var(--color-ink-200);
+		}
+		& blockquote > :last-child {
+			margin-bottom: 0;
+		}
+		& hr {
+			border: 0;
+			border-top: 1px solid var(--color-ink-800);
+			margin: 2em 0;
+		}
+		& img {
+			max-width: 100%;
+			height: auto;
+			border-radius: 10px;
+			border: 1px solid var(--color-ink-800);
+			margin: 0.25em 0;
+		}
+		& table {
+			display: block;
+			overflow-x: auto;
+			border-collapse: collapse;
+			font-size: 0.92em;
+		}
+		& th,
+		& td {
+			border: 1px solid var(--color-ink-800);
+			padding: 0.45em 0.8em;
+			text-align: left;
+		}
+		& th {
+			background: var(--color-ink-850);
+			color: var(--color-ink-100);
+			font-weight: 600;
+		}
+		/* Checklists: the checkbox replaces the bullet. */
+		& li:has(> input[type='checkbox']) {
+			list-style: none;
+			margin-left: -1.4em;
+		}
+		& input[type='checkbox'] {
+			margin-right: 0.5em;
+			vertical-align: -0.1em;
+			accent-color: var(--color-primary-400);
+		}
+	}
+}
+
+/*
+ * Chart colours: the validated categorical palette (checked for colour-blind
+ * separation against Lithium's light and dark card surfaces). Separate from
+ * the brand red on purpose: charts need hues that stay distinguishable.
+ */
+:root {
+	--viz-1: #3987e5;
+	--viz-2: #d95926;
+	--viz-3: #199e70;
+	--viz-4: #c98500;
+	--viz-5: #d55181;
+	--viz-grid: #26262c;
+	--viz-axis: #3a3a42;
+}
+:root[data-theme='light'] {
+	--viz-1: #2a78d6;
+	--viz-2: #eb6834;
+	--viz-3: #1baf7a;
+	--viz-4: #eda100;
+	--viz-5: #e87ba4;
+	--viz-grid: #ececef;
+	--viz-axis: #d2d2d9;
+}
