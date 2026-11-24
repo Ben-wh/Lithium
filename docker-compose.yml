@@ -14,6 +14,16 @@ services:
       # Set to true when serving over HTTPS (e.g. behind Caddy/Traefik).
       LITHIUM_SECURE_COOKIES: ${LITHIUM_SECURE_COOKIES:-false}
       LITHIUM_TRUST_PROXY: ${LITHIUM_TRUST_PROXY:-false}
+      # Where people reach Lithium, for links in emails (e.g. https://help.example.com).
+      LITHIUM_BASE_URL: ${LITHIUM_BASE_URL:-}
+      # Email notifications: off unless LITHIUM_SMTP_HOST is set.
+      LITHIUM_SMTP_HOST: ${LITHIUM_SMTP_HOST:-}
+      LITHIUM_SMTP_PORT: ${LITHIUM_SMTP_PORT:-}
+      LITHIUM_SMTP_USERNAME: ${LITHIUM_SMTP_USERNAME:-}
+      LITHIUM_SMTP_PASSWORD: ${LITHIUM_SMTP_PASSWORD:-}
+      LITHIUM_SMTP_FROM: ${LITHIUM_SMTP_FROM:-}
+      # starttls (default, port 587), tls (port 465) or none (local test servers only).
+      LITHIUM_SMTP_TLS: ${LITHIUM_SMTP_TLS:-}
 
 volumes:
   lithium-data:

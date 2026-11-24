@@ -56,7 +56,7 @@
 	}
 
 	const dangerBtn =
-		'inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary-600 px-3.5 text-sm font-semibold text-white transition hover:bg-primary-500 disabled:cursor-not-allowed disabled:opacity-40';
+		'inline-flex h-9 items-center gap-1.5 rounded-lg bg-danger-600 px-3.5 text-sm font-semibold text-white transition hover:bg-danger-500 disabled:cursor-not-allowed disabled:opacity-40';
 	const ghostBtn = 'h-9 rounded-lg px-3.5 text-sm text-ink-400 transition hover:bg-ink-850 hover:text-ink-100';
 </script>
 
@@ -81,10 +81,10 @@
 					<span>Their account is removed and they're signed out everywhere.</span>
 				</li>
 				<li class="flex gap-2.5">
-					<Icon name="trash" class="mt-0.5 size-4 shrink-0 text-primary-300" />
+					<Icon name="trash" class="mt-0.5 size-4 shrink-0 text-danger-300" />
 					{#if user.ticketCount > 0}
 						<span>
-							<strong class="font-semibold text-primary-200">{plural(user.ticketCount, 'ticket')}</strong> they raised
+							<strong class="font-semibold text-danger-200">{plural(user.ticketCount, 'ticket')}</strong> they raised
 							will be permanently deleted, with all replies and images.
 						</span>
 					{:else}
@@ -109,7 +109,7 @@
 				<button
 					type="button"
 					onclick={() => (step = 2)}
-					class="inline-flex h-9 items-center rounded-lg border border-primary-400/50 px-3.5 text-sm font-medium text-primary-200 transition hover:bg-primary-400/10"
+					class="inline-flex h-9 items-center rounded-lg border border-danger-400/50 px-3.5 text-sm font-medium text-danger-200 transition hover:bg-danger-400/10"
 				>
 					Continue
 				</button>
@@ -117,7 +117,7 @@
 		{:else}
 			<form onsubmit={confirmDelete} class="space-y-4">
 				{#if error}
-					<p role="alert" class="rounded-lg border border-primary-400/25 bg-primary-400/10 px-3 py-2 text-sm text-primary-200">{error}</p>
+					<p role="alert" class="rounded-lg border border-danger-400/25 bg-danger-400/10 px-3 py-2 text-sm text-danger-200">{error}</p>
 				{/if}
 				<div>
 					<label for="confirm-email" class="mb-1.5 block text-[13px] font-medium text-ink-200">
@@ -130,11 +130,11 @@
 						autocomplete="off"
 						spellcheck="false"
 						autofocus
-						class={['field font-mono text-[13px]', emailMatches && 'border-primary-400/60!']}
+						class={['field font-mono text-[13px]', emailMatches && 'border-danger-400/60!']}
 					/>
 				</div>
 				<label class="flex cursor-pointer items-start gap-2.5 text-sm text-ink-200">
-					<input type="checkbox" bind:checked={understood} class="mt-0.5 size-4 shrink-0 cursor-pointer accent-[var(--color-primary-600)]" />
+					<input type="checkbox" bind:checked={understood} class="mt-0.5 size-4 shrink-0 cursor-pointer accent-[var(--color-danger-600)]" />
 					<span>
 						I understand
 						{user.ticketCount > 0

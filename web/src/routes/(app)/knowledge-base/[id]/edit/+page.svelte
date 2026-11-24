@@ -127,7 +127,7 @@
 	</div>
 
 	{#if error}
-		<p role="alert" class="mt-4 rounded-lg border border-primary-400/25 bg-primary-400/10 px-3 py-2 text-sm text-primary-200">{error}</p>
+		<p role="alert" class="mt-4 rounded-lg border border-danger-400/25 bg-danger-400/10 px-3 py-2 text-sm text-danger-200">{error}</p>
 	{/if}
 
 	<!-- Title and details -->

@@ -3,7 +3,7 @@
 	import { page } from '$app/state';
 	import { ApiError, login, logout, twoFactor } from '$lib/api';
 	import CodeInput from '$lib/components/CodeInput.svelte';
-	import Logo from '$lib/components/Logo.svelte';
+	import BrandLogo from '$lib/components/BrandLogo.svelte';
 	import ThemeSwitcher from '$lib/components/ThemeSwitcher.svelte';
 
 	let { data } = $props();
@@ -107,7 +107,7 @@
 
 	<div class="relative w-full max-w-95">
 		<div class="mb-8 flex flex-col items-center text-center">
-			<Logo size={44} />
+			<BrandLogo size={44} maxWidth={240} />
 			{#if step === 'code'}
 				<h1 class="mt-6 text-2xl font-semibold tracking-tight text-ink-100">Two-factor authentication</h1>
 				<p class="mt-1.5 text-sm text-ink-400">
@@ -115,7 +115,9 @@
 				</p>
 			{:else}
 				<h1 class="mt-6 text-2xl font-semibold tracking-tight text-ink-100">Welcome back</h1>
-				<p class="mt-1.5 text-sm text-ink-400">Sign in to your Lithium workspace</p>
+				<p class="mt-1.5 text-sm text-ink-400">
+					Sign in to {page.data.branding?.companyName || 'your Lithium workspace'}
+				</p>
 			{/if}
 		</div>
 
@@ -126,7 +128,7 @@
 				novalidate
 			>
 				{#if error}
-					<p role="alert" class="mb-5 rounded-lg border border-primary-400/25 bg-primary-400/10 px-3 py-2.5 text-sm text-primary-200">
+					<p role="alert" class="mb-5 rounded-lg border border-danger-400/25 bg-danger-400/10 px-3 py-2.5 text-sm text-danger-200">
 						{error}
 					</p>
 				{/if}

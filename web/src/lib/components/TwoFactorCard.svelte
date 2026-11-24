@@ -108,7 +108,7 @@
 	</div>
 
 	{#if loadFailed}
-		<p class="mt-4 text-sm text-primary-200">Couldn't load your two-factor settings.</p>
+		<p class="mt-4 text-sm text-danger-200">Couldn't load your two-factor settings.</p>
 	{:else if enrolling}
 		<div class="mt-5 max-w-sm border-t border-ink-800 pt-5">
 			<TwoFactorEnrol {email} ondone={enrolled} oncancel={() => (enrolling = false)} doneLabel="Done" />
@@ -156,7 +156,7 @@
 	{:else}
 		<form onsubmit={submit} novalidate>
 			{#if error}
-				<p role="alert" class="mb-4 rounded-lg border border-primary-400/25 bg-primary-400/10 px-3 py-2 text-sm text-primary-200">{error}</p>
+				<p role="alert" class="mb-4 rounded-lg border border-danger-400/25 bg-danger-400/10 px-3 py-2 text-sm text-danger-200">{error}</p>
 			{/if}
 			<PasswordField id="tfa-password" label="Password" autocomplete="current-password" placeholder="" bind:value={password} />
 			<div class="mt-6 flex justify-end gap-2">

@@ -100,13 +100,13 @@
 			{:else if status === 'saved'}
 				<span class="flex items-center gap-1 text-ink-400"><Icon name="check" class="size-3.5 text-primary-300" /> Saved</span>
 			{:else if status === 'error'}
-				<span class="text-primary-300">Couldn't save. Try again.</span>
+				<span class="text-danger-300">Couldn't save. Try again.</span>
 			{/if}
 		</span>
 	</div>
 	<div class="px-5 py-4">
 		{#if loadFailed}
-			<p class="text-sm text-primary-200">Couldn't load settings.</p>
+			<p class="text-sm text-danger-200">Couldn't load settings.</p>
 		{:else if !settings}
 			<p class="text-sm text-ink-500">Loading…</p>
 		{:else}
@@ -163,7 +163,7 @@
 								spellcheck="false"
 								aria-invalid={!!prefixError}
 								aria-describedby="ticket-prefix-preview"
-								class={['field h-9 w-28 pr-8 font-mono text-[13px] uppercase', prefixError && 'border-primary-400/70!']}
+								class={['field h-9 w-28 pr-8 font-mono text-[13px] uppercase', prefixError && 'border-danger-400/70!']}
 							/>
 							<span class="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 font-mono text-[13px] text-ink-500">-</span>
 						</div>
@@ -177,7 +177,7 @@
 					</div>
 					<p id="ticket-prefix-preview" class="text-xs" aria-live="polite">
 						{#if prefixError}
-							<span class="text-primary-300">{prefixError}</span>
+							<span class="text-danger-300">{prefixError}</span>
 						{:else if prefixValid}
 							<span class="text-ink-500">Looks like</span>
 							<span class="font-mono text-ink-200">{ticketRef(1042, prefixClean)}</span>
@@ -208,7 +208,7 @@
 								min={LENGTH_LIMITS.subject.min}
 								max={LENGTH_LIMITS.subject.max}
 								aria-describedby="limits-hint"
-								class={['field h-9 w-24 text-[13px] tabular-nums', !inRange(subjectMax, LENGTH_LIMITS.subject) && 'border-primary-400/70!']}
+								class={['field h-9 w-24 text-[13px] tabular-nums', !inRange(subjectMax, LENGTH_LIMITS.subject) && 'border-danger-400/70!']}
 							/>
 						</div>
 						<div>
@@ -223,7 +223,7 @@
 								min={LENGTH_LIMITS.description.min}
 								max={LENGTH_LIMITS.description.max}
 								aria-describedby="limits-hint"
-								class={['field h-9 w-28 text-[13px] tabular-nums', !inRange(descriptionMax, LENGTH_LIMITS.description) && 'border-primary-400/70!']}
+								class={['field h-9 w-28 text-[13px] tabular-nums', !inRange(descriptionMax, LENGTH_LIMITS.description) && 'border-danger-400/70!']}
 							/>
 						</div>
 						<button
@@ -237,7 +237,7 @@
 				</div>
 				<p id="limits-hint" class="mt-2 text-right text-xs" aria-live="polite">
 					{#if limitsError}
-						<span class="text-primary-300">{limitsError}</span>
+						<span class="text-danger-300">{limitsError}</span>
 					{:else}
 						<span class="text-ink-500">
 							Subject {LENGTH_LIMITS.subject.min}–{LENGTH_LIMITS.subject.max} · Description

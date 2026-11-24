@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { ApiError, changePassword, logout } from '$lib/api';
-	import Logo from '$lib/components/Logo.svelte';
+	import BrandLogo from '$lib/components/BrandLogo.svelte';
 	import ThemeSwitcher from '$lib/components/ThemeSwitcher.svelte';
 	import PasswordField, { passwordsMatch } from '$lib/components/PasswordField.svelte';
 
@@ -57,7 +57,7 @@
 
 	<div class="relative w-full max-w-95">
 		<div class="mb-8 flex flex-col items-center text-center">
-			<Logo size={44} />
+			<BrandLogo size={44} maxWidth={240} />
 			<h1 class="mt-6 text-2xl font-semibold tracking-tight text-ink-100">Choose a new password</h1>
 			<p class="mt-1.5 text-sm text-ink-400">
 				Welcome{data.user ? `, ${data.user.name.split(' ')[0]}` : ''}. Your password was set by an
@@ -71,7 +71,7 @@
 			class="rounded-2xl border border-ink-800 bg-ink-900/70 p-6 shadow-2xl shadow-shade/40 backdrop-blur-sm"
 		>
 			{#if error}
-				<p role="alert" class="mb-5 rounded-lg border border-primary-400/25 bg-primary-400/10 px-3 py-2.5 text-sm text-primary-200">
+				<p role="alert" class="mb-5 rounded-lg border border-danger-400/25 bg-danger-400/10 px-3 py-2.5 text-sm text-danger-200">
 					{error}
 				</p>
 			{/if}

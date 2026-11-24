@@ -257,7 +257,7 @@
 			>
 				{loadingMore ? 'Loading…' : `Load more (${(data.list.total - items.length).toLocaleString()} left)`}
 			</button>
-			{#if loadMoreFailed}<p class="text-xs text-primary-300">Couldn't load more tickets. Try again.</p>{/if}
+			{#if loadMoreFailed}<p class="text-xs text-danger-300">Couldn't load more tickets. Try again.</p>{/if}
 		</div>
 	{/if}
 </div>

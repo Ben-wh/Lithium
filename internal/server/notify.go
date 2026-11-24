@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
@@ -80,11 +81,80 @@ func (r *recipients) add(id int64) {
 	r.ids = append(r.ids, id)
 }
 
-func (s *Server) notify(ctx context.Context, rs *recipients, ticketID int64, kind, summary string) {
-	if err := s.store.Notify(ctx, rs.ids, ticketID, rs.actor, kind, summary); err != nil {
-		// Notifications are best-effort: the reply or change itself succeeded.
-		s.log.Error("notify", "err", err, "ticket_id", ticketID, "kind", kind)
+func (s *Server) notify(ctx context.Context, rs *recipients, t store.Ticket, kind, summary string) {
+	if len(rs.ids) == 0 {
+		return
 	}
+	var email *store.EmailContent
+	if s.emailOn(ctx) {
+		e, err := s.notificationEmail(ctx, rs.actor, t, summary)
+		if err != nil {
+			s.log.Error("compose notification email", "err", err, "ticket_id", t.ID)
+		} else {
+			email = &e
+		}
+	}
+	if err := s.store.Notify(ctx, rs.ids, t.ID, rs.actor, kind, summary, email); err != nil {
+		// Notifications are best-effort: the reply or change itself succeeded.
+		s.log.Error("notify", "err", err, "ticket_id", t.ID, "kind", kind)
+	}
+}
+
+// emailOn reports whether notification emails should be queued: SMTP is
+// set up and an admin hasn't turned them off. People can still opt out
+// individually (checked when queueing).
+func (s *Server) emailOn(ctx context.Context) bool {
+	if !s.cfg.Mail.Enabled() {
+		return false
+	}
+	st, err := s.store.Settings(ctx)
+	if err != nil {
+		s.log.Error("get settings", "err", err)
+		return false
+	}
+	return st.EmailNotifications
+}
+
+// notificationEmail is the email version of a notification: who did what,
+// on which ticket, and a link to it. It never includes reply or note text,
+// and in sensitive mode it leaves out the ticket's subject too.
+func (s *Server) notificationEmail(ctx context.Context, actorID int64, t store.Ticket, summary string) (store.EmailContent, error) {
+	st, err := s.store.Settings(ctx)
+	if err != nil {
+		return store.EmailContent{}, err
+	}
+	brand := brandName(st)
+	actor := "Someone"
+	if u, err := s.store.UserByID(ctx, actorID); err == nil {
+		actor = u.Name
+	}
+	ref := st.TicketPrefix + "-" + strconv.FormatInt(t.ID, 10)
+
+	e := store.EmailContent{Line: fmt.Sprintf("%s %s.", actor, summary)}
+	var b strings.Builder
+	if st.SensitiveMode {
+		e.Subject = "[" + ref + "] New activity"
+		fmt.Fprintf(&b, "%s\n", ref)
+	} else {
+		e.Subject = "[" + ref + "] " + t.Subject
+		fmt.Fprintf(&b, "%s: %s\n", ref, t.Subject)
+	}
+	if s.cfg.BaseURL != "" {
+		fmt.Fprintf(&b, "\nView the ticket: %s/tickets/%d\n", s.cfg.BaseURL, t.ID)
+	} else {
+		fmt.Fprintf(&b, "\nSign in to %s to view it.\n", brand)
+	}
+	fmt.Fprintf(&b, "\n-- \nYou're getting this because you're involved in this ticket in %s.\n", brand)
+	e.Rest = b.String()
+	return e, nil
+}
+
+// brandName is what emails call the workspace: the company name, or Lithium.
+func brandName(st store.Settings) string {
+	if st.CompanyName != "" {
+		return st.CompanyName
+	}
+	return "Lithium"
 }
 
 // notifyComment tells people about a new reply or internal note. Anyone
@@ -104,7 +174,7 @@ func (s *Server) notifyComment(ctx context.Context, t store.Ticket, author store
 			mentioned.add(id)
 		}
 	}
-	s.notify(ctx, mentioned, t.ID, "mention", "mentioned you"+where)
+	s.notify(ctx, mentioned, t, "mention", "mentioned you"+where)
 
 	// Members of mentioned groups who can see the ticket, unless already told.
 	notified := map[int64]bool{}
@@ -127,7 +197,7 @@ func (s *Server) notifyComment(ctx context.Context, t store.Ticket, author store
 				notified[m.ID] = true
 			}
 		}
-		s.notify(ctx, members, t.ID, "mention", "mentioned "+g.Name+where)
+		s.notify(ctx, members, t, "mention", "mentioned "+g.Name+where)
 	}
 
 	// Everyone else involved. Internal notes never reach the requester.
@@ -139,11 +209,11 @@ func (s *Server) notifyComment(ctx context.Context, t store.Ticket, author store
 		others.add(t.Assignee.ID)
 	}
 	if c.Internal {
-		s.notify(ctx, others, t.ID, "note", "added an internal note")
+		s.notify(ctx, others, t, "note", "added an internal note")
 		return
 	}
 	others.add(t.Requester.ID)
-	s.notify(ctx, others, t.ID, "reply", "replied")
+	s.notify(ctx, others, t, "reply", "replied")
 }
 
 var statusNames = map[string]string{
@@ -199,7 +269,7 @@ func (s *Server) notifyUpdate(ctx context.Context, t store.Ticket, actor store.U
 	if reassigned && t.Assignee != nil {
 		assignee := newRecipients(actor.ID)
 		assignee.add(t.Assignee.ID)
-		s.notify(ctx, assignee, t.ID, "assigned", "assigned this to you")
+		s.notify(ctx, assignee, t, "assigned", "assigned this to you")
 	}
 
 	others := newRecipients(actor.ID)
@@ -207,5 +277,5 @@ func (s *Server) notifyUpdate(ctx context.Context, t store.Ticket, actor store.U
 	if t.Assignee != nil && !reassigned {
 		others.add(t.Assignee.ID)
 	}
-	s.notify(ctx, others, t.ID, "update", describeChanges(changes))
+	s.notify(ctx, others, t, "update", describeChanges(changes))
 }

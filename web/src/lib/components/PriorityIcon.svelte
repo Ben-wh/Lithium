@@ -8,9 +8,9 @@
 
 {#if priority === 'urgent'}
 	<svg class={cls} viewBox="0 0 16 16" aria-hidden="true">
-		<rect x="1" y="1" width="14" height="14" rx="3.5" class="fill-primary-400" />
-		<path d="M8 4.5V9" stroke-width="2" stroke-linecap="round" class="stroke-primary-950" />
-		<circle cx="8" cy="11.75" r="1.1" class="fill-primary-950" />
+		<rect x="1" y="1" width="14" height="14" rx="3.5" class="fill-danger-400" />
+		<path d="M8 4.5V9" stroke-width="2" stroke-linecap="round" class="stroke-danger-950" />
+		<circle cx="8" cy="11.75" r="1.1" class="fill-danger-950" />
 	</svg>
 {:else}
 	<svg class={cls} viewBox="0 0 16 16" aria-hidden="true">

@@ -152,7 +152,7 @@
 					/>
 				{/if}
 				{#if error}
-					<p role="alert" class="mt-3 text-sm text-primary-300">{error}</p>
+					<p role="alert" class="mt-3 text-sm text-danger-300">{error}</p>
 				{/if}
 			</div>
 		</div>

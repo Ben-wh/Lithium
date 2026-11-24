@@ -112,7 +112,7 @@
 				{#if loading && items.length === 0}
 					<p class="px-4 py-10 text-center text-sm text-ink-500">Loading…</p>
 				{:else if loadFailed}
-					<p class="px-4 py-10 text-center text-sm text-primary-300">Couldn't load notifications.</p>
+					<p class="px-4 py-10 text-center text-sm text-danger-300">Couldn't load notifications.</p>
 				{:else if items.length === 0}
 					<div class="flex flex-col items-center px-4 py-10 text-center">
 						<span class="flex size-10 items-center justify-center rounded-xl bg-primary-400/10 text-primary-400">

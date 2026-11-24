@@ -85,7 +85,7 @@
 	<p class="mb-1 flex items-center gap-1.5 text-xs text-ink-500"><Icon name="link" class="size-3.5" /> Linked tickets</p>
 
 	{#if error}
-		<p role="alert" class="my-1.5 text-xs text-primary-300">{error}</p>
+		<p role="alert" class="my-1.5 text-xs text-danger-300">{error}</p>
 	{/if}
 
 	<p class="mt-2 px-2 text-[11px] font-medium tracking-wide text-ink-500 uppercase">Part of</p>

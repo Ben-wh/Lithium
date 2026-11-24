@@ -239,7 +239,7 @@
 <Modal bind:open={colOpen} title={editingCol ? 'Edit collection' : 'New collection'} description="Collections group related articles together.">
 	<form onsubmit={saveCollection} class="space-y-4">
 		{#if colError}
-			<p role="alert" class="rounded-lg border border-primary-400/25 bg-primary-400/10 px-3 py-2 text-sm text-primary-200">{colError}</p>
+			<p role="alert" class="rounded-lg border border-danger-400/25 bg-danger-400/10 px-3 py-2 text-sm text-danger-200">{colError}</p>
 		{/if}
 		<div>
 			<label for="col-name" class="mb-1.5 block text-[13px] font-medium text-ink-200">Name</label>
@@ -251,7 +251,7 @@
 		</div>
 		<div class="flex items-center justify-between gap-2 pt-1">
 			{#if editingCol}
-				<button type="button" onclick={() => editingCol && deleteCollection(editingCol)} class="text-sm text-ink-400 hover:text-primary-300">Delete collection</button>
+				<button type="button" onclick={() => editingCol && deleteCollection(editingCol)} class="text-sm text-ink-400 hover:text-danger-300">Delete collection</button>
 			{:else}
 				<span></span>
 			{/if}

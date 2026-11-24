@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { ApiError, requestPasswordReset } from '$lib/api';
 	import Icon from '$lib/components/Icon.svelte';
-	import Logo from '$lib/components/Logo.svelte';
+	import BrandLogo from '$lib/components/BrandLogo.svelte';
 	import ThemeSwitcher from '$lib/components/ThemeSwitcher.svelte';
 
 	let email = $state('');
@@ -42,7 +42,7 @@
 
 	<div class="relative w-full max-w-95">
 		<div class="mb-8 flex flex-col items-center text-center">
-			<Logo size={44} />
+			<BrandLogo size={44} maxWidth={240} />
 			<h1 class="mt-6 text-2xl font-semibold tracking-tight text-ink-100">
 				{sent ? 'Request sent' : 'Forgot your password?'}
 			</h1>
@@ -67,7 +67,7 @@
 			{:else}
 				<form onsubmit={submit} novalidate>
 					{#if error}
-						<p role="alert" class="mb-5 rounded-lg border border-primary-400/25 bg-primary-400/10 px-3 py-2.5 text-sm text-primary-200">
+						<p role="alert" class="mb-5 rounded-lg border border-danger-400/25 bg-danger-400/10 px-3 py-2.5 text-sm text-danger-200">
 							{error}
 						</p>
 					{/if}

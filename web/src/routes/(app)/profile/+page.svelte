@@ -3,6 +3,7 @@
 	import Icon from '$lib/components/Icon.svelte';
 	import ProfilePicture from '$lib/components/ProfilePicture.svelte';
 	import TwoFactorCard from '$lib/components/TwoFactorCard.svelte';
+	import EmailNotificationsCard from '$lib/components/EmailNotificationsCard.svelte';
 	import PasswordField, { passwordsMatch } from '$lib/components/PasswordField.svelte';
 
 	let { data } = $props();
@@ -83,7 +84,7 @@
 
 		<form onsubmit={submit} novalidate class="mt-5 max-w-sm space-y-4">
 			{#if error}
-				<p role="alert" class="rounded-lg border border-primary-400/25 bg-primary-400/10 px-3 py-2 text-sm text-primary-200">
+				<p role="alert" class="rounded-lg border border-danger-400/25 bg-danger-400/10 px-3 py-2 text-sm text-danger-200">
 					{error}
 				</p>
 			{:else if success}
@@ -113,5 +114,6 @@
 
 	{#if data.user}
 		<TwoFactorCard email={data.user.email} />
+		<EmailNotificationsCard user={data.user} />
 	{/if}
 </div>

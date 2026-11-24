@@ -241,7 +241,7 @@
 			{#if uploading}
 				Uploading {uploading} {uploading === 1 ? 'image' : 'images'}…
 			{:else if error}
-				<span class="text-primary-300" role="alert">{error}</span>
+				<span class="text-danger-300" role="alert">{error}</span>
 			{:else}
 				Markdown supported · drag, paste or upload images (10 MB max)
 			{/if}

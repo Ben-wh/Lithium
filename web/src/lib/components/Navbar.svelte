@@ -3,12 +3,17 @@
 	import { page } from '$app/state';
 	import { logout, type User } from '$lib/api';
 	import Icon, { type IconName } from './Icon.svelte';
-	import Logo from './Logo.svelte';
+	import BrandLogo from './BrandLogo.svelte';
 	import Avatar from './Avatar.svelte';
 	import ThemeSwitcher from './ThemeSwitcher.svelte';
 	import NotificationBell from './NotificationBell.svelte';
 
 	let { user }: { user: User } = $props();
+
+	// An uploaded logo without a company name is shown on its own (it's
+	// probably a wordmark); otherwise the name sits beside the logo.
+	const companyName = $derived(page.data.branding?.companyName ?? '');
+	const brandName = $derived(companyName || (page.data.branding?.logoUrl ? '' : 'Lithium'));
 
 	const allLinks: { href: string; label: string; icon: IconName; staffOnly?: boolean }[] = [
 		{ href: '/', label: 'Dashboard', icon: 'home' },
@@ -60,9 +65,15 @@
 <header class="sticky top-0 z-40 border-b border-ink-800 bg-ink-950/80 backdrop-blur-md">
 	<div class="mx-auto flex h-14 max-w-7xl items-center gap-6 px-4 sm:px-6">
 		<!-- Brand -->
-		<a href="/" class="flex shrink-0 items-center gap-2.5 rounded-md focus-visible:ring-2 focus-visible:ring-primary-400/40 focus-visible:outline-none">
-			<Logo size={26} />
-			<span class="text-[15px] font-semibold tracking-tight text-ink-100">Lithium</span>
+		<a
+			href="/"
+			aria-label={brandName ? undefined : 'Home'}
+			class="flex min-w-0 shrink-0 items-center gap-2.5 rounded-md focus-visible:ring-2 focus-visible:ring-primary-400/40 focus-visible:outline-none"
+		>
+			<BrandLogo size={26} maxWidth={160} />
+			{#if brandName}
+				<span class="max-w-48 truncate text-[15px] font-semibold tracking-tight text-ink-100">{brandName}</span>
+			{/if}
 		</a>
 
 		<!-- Primary nav (desktop) -->

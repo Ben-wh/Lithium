@@ -19,7 +19,14 @@ func (s *Server) handleGetSettings(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
-	writeJSON(w, http.StatusOK, st)
+	writeJSON(w, http.StatusOK, s.withServerSettings(st))
+}
+
+// withServerSettings fills in the settings that come from the server's
+// config rather than the database.
+func (s *Server) withServerSettings(st store.Settings) store.Settings {
+	st.EmailConfigured = s.cfg.Mail.Enabled()
+	return st
 }
 
 // Ticket ID prefixes are short and plain so references like "TID-42" are
@@ -40,9 +47,12 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 		IncidentTree         *bool   `json:"incidentTree"`
 		AgentGroups          *bool   `json:"agentGroups"`
 		Background           *string `json:"background"`
+		Accent               *string `json:"accent"`
 		SensitiveMode        *bool   `json:"sensitiveMode"`
 		SensitiveMessage     *string `json:"sensitiveMessage"`
 		RequireTwoFactor     *bool   `json:"requireTwoFactor"`
+		CompanyName          *string `json:"companyName"`
+		EmailNotifications   *bool   `json:"emailNotifications"`
 	}
 	if !decodeJSON(w, r, &req) {
 		return
@@ -64,8 +74,21 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 		}
 		req.SensitiveMessage = &trimmed
 	}
+	if n := req.CompanyName; n != nil {
+		// Blank goes back to plain Lithium branding.
+		trimmed := strings.Join(strings.Fields(*n), " ")
+		if utf8.RuneCountInString(trimmed) > store.CompanyNameMaxLength {
+			writeError(w, http.StatusBadRequest, fmt.Sprintf("company name must be %d characters or fewer", store.CompanyNameMaxLength))
+			return
+		}
+		req.CompanyName = &trimmed
+	}
 	if req.Background != nil && !store.Backgrounds[*req.Background] {
 		writeError(w, http.StatusBadRequest, "unknown background")
+		return
+	}
+	if req.Accent != nil && !store.Accents[*req.Accent] {
+		writeError(w, http.StatusBadRequest, "unknown accent colour")
 		return
 	}
 	if n := req.SubjectMaxLength; n != nil && (*n < store.SubjectMaxLengthMin || *n > store.SubjectMaxLengthMax) {
@@ -89,9 +112,12 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 		IncidentTree:         req.IncidentTree,
 		AgentGroups:          req.AgentGroups,
 		Background:           req.Background,
+		Accent:               req.Accent,
 		SensitiveMode:        req.SensitiveMode,
 		SensitiveMessage:     req.SensitiveMessage,
 		RequireTwoFactor:     req.RequireTwoFactor,
+		CompanyName:          req.CompanyName,
+		EmailNotifications:   req.EmailNotifications,
 	})
 	if err != nil {
 		s.log.Error("update settings", "err", err)
@@ -99,7 +125,7 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.log.Info("settings updated", "by", userFrom(r.Context()).ID)
-	writeJSON(w, http.StatusOK, st)
+	writeJSON(w, http.StatusOK, s.withServerSettings(st))
 }
 
 // handlePublicBanner returns only the sensitive mode banner, without needing

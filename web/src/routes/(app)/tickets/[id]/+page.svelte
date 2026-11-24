@@ -276,7 +276,7 @@
 					/>
 					<div class="mt-2 flex items-center justify-between gap-3">
 						{#if replyError}
-							<p role="alert" class="text-xs text-primary-300">{replyError}</p>
+							<p role="alert" class="text-xs text-danger-300">{replyError}</p>
 						{:else if internal}
 							<p class="text-xs text-ink-400">Hidden from {t.requester.name.split(' ')[0]}. They won't be notified.</p>
 						{:else}
@@ -302,7 +302,7 @@
 			{#if data.isStaff}
 				<div class="space-y-4">
 					{#if changeError}
-						<p role="alert" class="rounded-lg border border-primary-400/25 bg-primary-400/10 px-3 py-2 text-xs text-primary-200">{changeError}</p>
+						<p role="alert" class="rounded-lg border border-danger-400/25 bg-danger-400/10 px-3 py-2 text-xs text-danger-200">{changeError}</p>
 					{/if}
 
 					<div>

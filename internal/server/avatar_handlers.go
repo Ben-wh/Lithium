@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 
 	"github.com/lithium/lithium/internal/store"
@@ -102,6 +103,46 @@ func (s *Server) handleUploadAvatar(w http.ResponseWriter, r *http.Request) {
 	}
 	if !s.replaceAvatar(w, r, "custom:"+saved.storedName) {
 		os.Remove(saved.path)
+		return
+	}
+	s.writeMe(w, r)
+}
+
+// handleSetEmailNotifications changes the signed-in user's notification
+// email choices: on or off, and which kinds of event. Fields left out stay
+// as they are.
+func (s *Server) handleSetEmailNotifications(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Enabled *bool     `json:"enabled"`
+		Events  *[]string `json:"events"`
+	}
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	if req.Enabled == nil && req.Events == nil {
+		writeError(w, http.StatusBadRequest, "nothing to change")
+		return
+	}
+	prefs := store.EmailPreferences{Enabled: req.Enabled}
+	if req.Events != nil {
+		// Keep them in the standard order, without repeats.
+		events := store.EmailEvents{}
+		for _, known := range store.AllEmailEvents {
+			if slices.Contains(*req.Events, known) {
+				events = append(events, known)
+			}
+		}
+		for _, e := range *req.Events {
+			if !slices.Contains(store.AllEmailEvents, e) {
+				writeError(w, http.StatusBadRequest, "unknown email event "+strconv.Quote(e))
+				return
+			}
+		}
+		prefs.Events = &events
+	}
+	if err := s.store.SetEmailPreferences(r.Context(), userFrom(r.Context()).ID, prefs); err != nil {
+		s.log.Error("set email notifications", "err", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
 	s.writeMe(w, r)

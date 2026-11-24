@@ -360,7 +360,7 @@
 
 		<div class="mt-4 rounded-xl border border-ink-800 bg-ink-900/60">
 			{#if usersError}
-				<p class="px-5 py-10 text-center text-sm text-primary-200">{usersError}</p>
+				<p class="px-5 py-10 text-center text-sm text-danger-200">{usersError}</p>
 			{:else if usersLoading}
 				<p class="px-5 py-10 text-center text-sm text-ink-500">Loading users…</p>
 			{:else if users.length === 0}
@@ -513,7 +513,7 @@
 
 		<div class="mt-4 overflow-hidden rounded-xl border border-ink-800 bg-ink-900/60">
 			{#if resetsError}
-				<p class="px-5 py-10 text-center text-sm text-primary-200">{resetsError}</p>
+				<p class="px-5 py-10 text-center text-sm text-danger-200">{resetsError}</p>
 			{:else if resetsLoading}
 				<p class="px-5 py-10 text-center text-sm text-ink-500">Loading requests…</p>
 			{:else if resets.length === 0}
@@ -562,7 +562,7 @@
 <Modal bind:open={createOpen} title="Create user" description="They can sign in straight away with this password.">
 	<form onsubmit={submitCreate} class="space-y-4">
 		{#if createError}
-			<p role="alert" class="rounded-lg border border-primary-400/25 bg-primary-400/10 px-3 py-2 text-sm text-primary-200">
+			<p role="alert" class="rounded-lg border border-danger-400/25 bg-danger-400/10 px-3 py-2 text-sm text-danger-200">
 				{createError}
 			</p>
 		{/if}
@@ -634,7 +634,7 @@
 >
 	<form onsubmit={submitReset} class="space-y-4">
 		{#if resetError}
-			<p role="alert" class="rounded-lg border border-primary-400/25 bg-primary-400/10 px-3 py-2 text-sm text-primary-200">
+			<p role="alert" class="rounded-lg border border-danger-400/25 bg-danger-400/10 px-3 py-2 text-sm text-danger-200">
 				{resetError}
 			</p>
 		{/if}

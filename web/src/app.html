@@ -13,6 +13,10 @@
 				var light = pref === 'light' || (pref !== 'dark' && matchMedia('(prefers-color-scheme: light)').matches);
 				document.documentElement.dataset.theme = light ? 'light' : 'dark';
 				document.querySelector('meta[name="theme-color"]').content = light ? '#f6f6f8' : '#0d0d10';
+				// The workspace accent colour, remembered from the last visit (see src/lib/accents.ts).
+				var accent;
+				try { accent = localStorage.getItem('lithium-accent'); } catch (e) {}
+				if (accent && /^[a-z]+$/.test(accent)) document.documentElement.dataset.accent = accent;
 			})();
 		</script>
 		<link rel="icon" href="%sveltekit.assets%/favicon.svg" type="image/svg+xml" />

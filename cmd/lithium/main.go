@@ -15,6 +15,7 @@ import (
 	"github.com/lithium/lithium/internal/auth"
 	"github.com/lithium/lithium/internal/config"
 	"github.com/lithium/lithium/internal/db"
+	"github.com/lithium/lithium/internal/mail"
 	"github.com/lithium/lithium/internal/seed"
 	"github.com/lithium/lithium/internal/server"
 	"github.com/lithium/lithium/internal/store"
@@ -62,6 +63,9 @@ func main() {
 }
 
 func run(cfg config.Config, log *slog.Logger) error {
+	if err := cfg.Validate(); err != nil {
+		return err
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
@@ -79,6 +83,7 @@ func run(cfg config.Config, log *slog.Logger) error {
 		return err
 	}
 	go cleanupSessions(ctx, st, log)
+	startEmail(ctx, cfg, st, log)
 
 	srv, err := server.New(cfg, st, log)
 	if err != nil {
@@ -147,6 +152,31 @@ func bootstrapAdmin(ctx context.Context, cfg config.Config, st *store.Store, log
 		log.Info("added example knowledge base article")
 	}
 	return nil
+}
+
+// startEmail starts sending queued emails in the background, if SMTP is set up.
+func startEmail(ctx context.Context, cfg config.Config, st *store.Store, log *slog.Logger) {
+	if !cfg.Mail.Enabled() {
+		log.Info("email notifications off; set LITHIUM_SMTP_HOST to turn them on")
+		return
+	}
+	if cfg.BaseURL == "" {
+		log.Warn("LITHIUM_BASE_URL isn't set, so emails can't link to tickets")
+	}
+	log.Info("email notifications on", "smtp", fmt.Sprintf("%s:%d", cfg.Mail.Host, cfg.Mail.Port), "tls", cfg.Mail.TLS, "from", cfg.Mail.From)
+	outbox := &mail.Outbox{
+		Store:  st,
+		Sender: mail.NewSMTP(cfg.Mail),
+		From:   cfg.Mail.From,
+		FromName: func(ctx context.Context) string {
+			if s, err := st.Settings(ctx); err == nil && s.CompanyName != "" {
+				return s.CompanyName
+			}
+			return "Lithium"
+		},
+		Log: log,
+	}
+	go outbox.Run(ctx)
 }
 
 func cleanupSessions(ctx context.Context, st *store.Store, log *slog.Logger) {

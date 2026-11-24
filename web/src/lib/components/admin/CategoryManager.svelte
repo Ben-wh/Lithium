@@ -145,7 +145,7 @@
 	{/if}
 
 	{#if loadError}
-		<p class="px-5 py-10 text-center text-sm text-primary-200">{loadError}</p>
+		<p class="px-5 py-10 text-center text-sm text-danger-200">{loadError}</p>
 	{:else if loading}
 		<p class="px-5 py-10 text-center text-sm text-ink-500">Loading categories…</p>
 	{:else if categories.length === 0}
@@ -215,7 +215,7 @@
 >
 	<form onsubmit={save} novalidate class="space-y-4">
 		{#if formError}
-			<p role="alert" class="rounded-lg border border-primary-400/25 bg-primary-400/10 px-3 py-2 text-sm text-primary-200">{formError}</p>
+			<p role="alert" class="rounded-lg border border-danger-400/25 bg-danger-400/10 px-3 py-2 text-sm text-danger-200">{formError}</p>
 		{/if}
 		<div>
 			<label for="category-name" class={labelClass}>Name</label>

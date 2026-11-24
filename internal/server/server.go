@@ -9,6 +9,7 @@ import (
 
 	"github.com/lithium/lithium/internal/auth"
 	"github.com/lithium/lithium/internal/config"
+	"github.com/lithium/lithium/internal/mail"
 	"github.com/lithium/lithium/internal/store"
 )
 
@@ -16,10 +17,11 @@ type Server struct {
 	cfg          config.Config
 	store        *store.Store
 	log          *slog.Logger
-	limiter      *ipLimiter // login attempts
-	resetLimiter *ipLimiter // password reset requests
-	mfaLimiter   *ipLimiter // two-factor codes
-	dummyHash    string     // compared against when a login email doesn't exist, to keep timing uniform
+	limiter      *ipLimiter  // login attempts
+	resetLimiter *ipLimiter  // password reset requests
+	mfaLimiter   *ipLimiter  // two-factor codes
+	dummyHash    string      // compared against when a login email doesn't exist, to keep timing uniform
+	mailer       mail.Sender // nil when email isn't set up; used for test emails
 }
 
 func New(cfg config.Config, st *store.Store, log *slog.Logger) (*Server, error) {
@@ -35,7 +37,15 @@ func New(cfg config.Config, st *store.Store, log *slog.Logger) (*Server, error) 
 		resetLimiter: newIPLimiter(),
 		mfaLimiter:   newIPLimiter(),
 		dummyHash:    dummy,
+		mailer:       newMailer(cfg),
 	}, nil
+}
+
+func newMailer(cfg config.Config) mail.Sender {
+	if !cfg.Mail.Enabled() {
+		return nil
+	}
+	return mail.NewSMTP(cfg.Mail)
 }
 
 // Handler returns the root HTTP handler. frontend is the built SPA; it may be
@@ -59,6 +69,8 @@ func (s *Server) Handler(frontend fs.FS) http.Handler {
 	mux.Handle("POST /api/auth/2fa/disable", s.requireUser(http.HandlerFunc(s.handleDisableTwoFactor)))
 	mux.HandleFunc("POST /api/auth/password-reset-request", s.handleRequestPasswordReset)
 	mux.HandleFunc("GET /api/public/banner", s.handlePublicBanner) // no sign-in needed
+	mux.HandleFunc("GET /api/public/branding", s.handlePublicBranding)
+	mux.HandleFunc("GET /api/public/branding/logo", s.handleGetLogo)
 
 	mux.Handle("POST /api/tickets", s.requireUser(http.HandlerFunc(s.handleCreateTicket)))
 	mux.Handle("GET /api/tickets", s.requireUser(http.HandlerFunc(s.handleListTickets)))
@@ -79,6 +91,7 @@ func (s *Server) Handler(frontend fs.FS) http.Handler {
 	mux.Handle("GET /api/attachments/{id}", s.requireUser(http.HandlerFunc(s.handleGetAttachment)))
 	mux.Handle("PUT /api/profile/avatar", s.requireUser(http.HandlerFunc(s.handleSetPresetAvatar)))
 	mux.Handle("POST /api/profile/avatar", s.requireUser(http.HandlerFunc(s.handleUploadAvatar)))
+	mux.Handle("PUT /api/profile/email-notifications", s.requireUser(http.HandlerFunc(s.handleSetEmailNotifications)))
 	mux.Handle("GET /api/avatars/{id}", s.requireUser(http.HandlerFunc(s.handleGetAvatar)))
 	mux.Handle("GET /api/users", s.requireStaff(http.HandlerFunc(s.handleUserDirectory)))
 	mux.Handle("GET /api/reports", s.requireStaff(http.HandlerFunc(s.handleReport)))
@@ -118,6 +131,9 @@ func (s *Server) Handler(frontend fs.FS) http.Handler {
 	admin("PATCH /api/admin/categories/{id}", s.handleUpdateCategory)
 	admin("DELETE /api/admin/categories/{id}", s.handleDeleteCategory)
 	admin("PATCH /api/admin/settings", s.handleUpdateSettings)
+	admin("POST /api/admin/branding/logo", s.handleUploadLogo)
+	admin("DELETE /api/admin/branding/logo", s.handleDeleteLogo)
+	admin("POST /api/admin/email/test", s.handleSendTestEmail)
 	admin("GET /api/admin/groups", s.handleListGroups)
 	admin("POST /api/admin/groups", s.handleCreateGroup)
 	admin("PUT /api/admin/groups/{id}", s.handleUpdateGroup)

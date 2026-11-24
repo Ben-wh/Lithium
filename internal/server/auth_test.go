@@ -25,6 +25,21 @@ func newTestServer(t *testing.T) *httptest.Server {
 
 func newTestServerWithDataDir(t *testing.T, dataDir string) *httptest.Server {
 	t.Helper()
+	ts, _ := newTestServerWithConfig(t, config.Config{DataDir: dataDir})
+	return ts
+}
+
+// newTestServerWithConfig also returns the store, for tests that check what
+// was written (such as queued emails).
+func newTestServerWithConfig(t *testing.T, cfg config.Config) (*httptest.Server, *store.Store) {
+	t.Helper()
+	ts, srv := newTestServerWithMailer(t, cfg)
+	return ts, srv.store
+}
+
+// newTestServerWithMailer also returns the Server, so a test can swap its mailer.
+func newTestServerWithMailer(t *testing.T, cfg config.Config) (*httptest.Server, *Server) {
+	t.Helper()
 	ctx := context.Background()
 	conn, err := db.Open(ctx, filepath.Join(t.TempDir(), "test.db"))
 	if err != nil {
@@ -42,13 +57,13 @@ func newTestServerWithDataDir(t *testing.T, dataDir string) *httptest.Server {
 	if _, err := st.UpdateSettings(ctx, store.SettingsUpdate{RequireTwoFactor: &off}); err != nil {
 		t.Fatal(err)
 	}
-	srv, err := New(config.Config{DataDir: dataDir}, st, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	srv, err := New(cfg, st, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if err != nil {
 		t.Fatal(err)
 	}
 	ts := httptest.NewServer(srv.Handler(fstest.MapFS{"index.html": {Data: []byte("app")}}))
 	t.Cleanup(ts.Close)
-	return ts
+	return ts, srv
 }
 
 func post(t *testing.T, c *http.Client, url, body string) *http.Response {

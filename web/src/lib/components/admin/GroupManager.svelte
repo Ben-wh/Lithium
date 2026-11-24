@@ -154,7 +154,7 @@
 	{/if}
 
 	{#if loadError}
-		<p class="mt-6 text-center text-sm text-primary-200">{loadError}</p>
+		<p class="mt-6 text-center text-sm text-danger-200">{loadError}</p>
 	{:else if loading}
 		<p class="mt-6 text-center text-sm text-ink-500">Loading groups…</p>
 	{:else if groups.length === 0}
@@ -213,7 +213,7 @@
 <Modal bind:open title={editing ? 'Edit group' : 'New group'} description="Agents in this group can see tickets in these categories.">
 	<form onsubmit={save} novalidate class="space-y-5">
 		{#if formError}
-			<p role="alert" class="rounded-lg border border-primary-400/25 bg-primary-400/10 px-3 py-2 text-sm text-primary-200">{formError}</p>
+			<p role="alert" class="rounded-lg border border-danger-400/25 bg-danger-400/10 px-3 py-2 text-sm text-danger-200">{formError}</p>
 		{/if}
 		<div>
 			<label for="group-name" class={labelClass}>Name</label>

@@ -21,8 +21,9 @@ type Notification struct {
 	CreatedAt time.Time          `json:"createdAt"`
 }
 
-// Notify records the same notification for each recipient.
-func (s *Store) Notify(ctx context.Context, recipients []int64, ticketID, actorID int64, kind, summary string) error {
+// Notify records the same notification for each recipient and, when email
+// is non-nil, queues an email to each of them in the same transaction.
+func (s *Store) Notify(ctx context.Context, recipients []int64, ticketID, actorID int64, kind, summary string, email *EmailContent) error {
 	if len(recipients) == 0 {
 		return nil
 	}
@@ -31,11 +32,17 @@ func (s *Store) Notify(ctx context.Context, recipients []int64, ticketID, actorI
 		return err
 	}
 	defer tx.Rollback()
-	now := time.Now().Unix()
+	nowT := time.Now()
+	now := nowT.Unix()
 	for _, uid := range recipients {
 		if _, err := tx.ExecContext(ctx, `
 			INSERT INTO notifications (user_id, ticket_id, actor_id, kind, summary, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
 			uid, ticketID, nullID(actorID), kind, summary, now); err != nil {
+			return err
+		}
+	}
+	if email != nil {
+		if err := enqueueEmails(ctx, tx, recipients, ticketID, kind, *email, nowT); err != nil {
 			return err
 		}
 	}

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { logout } from '$lib/api';
-	import Logo from '$lib/components/Logo.svelte';
+	import BrandLogo from '$lib/components/BrandLogo.svelte';
 	import ThemeSwitcher from '$lib/components/ThemeSwitcher.svelte';
 	import TwoFactorEnrol from '$lib/components/TwoFactorEnrol.svelte';
 
@@ -26,7 +26,7 @@
 
 	<div class="relative w-full max-w-105">
 		<div class="mb-8 flex flex-col items-center text-center">
-			<Logo size={44} />
+			<BrandLogo size={44} maxWidth={240} />
 			<h1 class="mt-6 text-2xl font-semibold tracking-tight text-ink-100">Set up two-factor authentication</h1>
 			<p class="mt-1.5 text-sm text-ink-400">
 				Your workspace requires a code from an authenticator app when you sign in. It takes about a minute.

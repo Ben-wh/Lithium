@@ -18,7 +18,7 @@
 	class={[
 		'group flex items-center gap-3 rounded-lg px-2.5 py-3 transition hover:bg-ink-850/60 focus-visible:bg-ink-850/60 focus-visible:outline-none sm:gap-4 sm:px-3.5',
 		// Urgent tickets get a red outline. Inset so it doesn't shift the layout or overlap the row dividers.
-		t.priority === 'urgent' && 'bg-primary-400/5 ring-1 ring-primary-300/80 ring-inset'
+		t.priority === 'urgent' && 'bg-danger-400/5 ring-1 ring-danger-300/80 ring-inset'
 	]}
 >
 	<span title="{priorityLabel(t.priority)} priority" class="shrink-0 text-ink-400">

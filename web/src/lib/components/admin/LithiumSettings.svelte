@@ -9,7 +9,7 @@
 	// empty for now; real settings get added to the matching block below.
 	const sections = [
 		{ id: 'tickets', label: 'Tickets', noun: 'ticket', icon: 'ticket', description: 'Defaults and rules for how tickets are raised and worked.' },
-		{ id: 'appearance', label: 'Appearance', noun: 'appearance', icon: 'palette', description: 'How Lithium looks for everyone.' },
+		{ id: 'appearance', label: 'Appearance', noun: 'appearance', icon: 'palette', description: 'Your branding, colours and how Lithium looks for everyone.' },
 		{ id: 'users', label: 'Users', noun: 'user', icon: 'users', description: 'Sign-in, password rules and defaults for new accounts.' }
 	] as const satisfies readonly { id: string; label: string; noun: string; icon: IconName; description: string }[];
 

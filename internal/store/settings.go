@@ -2,6 +2,8 @@ package store
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"strconv"
 	"time"
 )
@@ -30,6 +32,8 @@ type Settings struct {
 	AgentGroups bool `json:"agentGroups"`
 	// Background is the app-wide background pattern (see Backgrounds).
 	Background string `json:"background"`
+	// Accent is the app-wide pastel accent colour (see Accents).
+	Accent string `json:"accent"`
 	// SensitiveMode shows a red banner with SensitiveMessage above the navbar
 	// on every page.
 	SensitiveMode    bool   `json:"sensitiveMode"`
@@ -37,6 +41,36 @@ type Settings struct {
 	// RequireTwoFactor makes everyone set up an authenticator app before
 	// they can use Lithium.
 	RequireTwoFactor bool `json:"requireTwoFactor"`
+	// CompanyName replaces "Lithium" in the navbar and on the sign-in pages.
+	// Blank means no custom name.
+	CompanyName string `json:"companyName"`
+	// EmailNotifications lets Lithium email people about their tickets, as
+	// well as notifying them in the app. Needs SMTP set up on the server.
+	EmailNotifications bool `json:"emailNotifications"`
+	// EmailConfigured reports whether the server has SMTP set up. Set by the
+	// server from its config, not stored.
+	EmailConfigured bool `json:"emailConfigured"`
+	// LogoFile is the stored name of the uploaded company logo under
+	// <data dir>/branding/, or "". LogoURL is where the web app loads it.
+	LogoFile string `json:"-"`
+	LogoURL  string `json:"logoUrl"`
+}
+
+// CompanyNameMaxLength caps the company name, in characters.
+const CompanyNameMaxLength = 60
+
+// BrandingLogoURL turns a stored logo file name into the URL the web app
+// loads. The version changes with every upload, so browsers never show a
+// stale logo.
+func BrandingLogoURL(file string) string {
+	if file == "" {
+		return ""
+	}
+	v := file
+	if len(v) > 8 {
+		v = v[:8]
+	}
+	return "/api/public/branding/logo?v=" + v
 }
 
 // DefaultSensitiveMessage is shown when sensitive mode has no custom message.
@@ -44,6 +78,12 @@ const DefaultSensitiveMessage = "Sensitive system: handle all data in line with 
 
 // Backgrounds admins can choose from. Keep in sync with web/src/lib/backgrounds.ts.
 var Backgrounds = map[string]bool{"none": true, "dots": true, "grid": true, "lines": true, "waves": true, "glow": true}
+
+// Accents admins can choose from. Keep in sync with web/src/lib/accents.ts.
+var Accents = map[string]bool{
+	"coral": true, "peach": true, "butter": true, "mint": true, "aqua": true,
+	"sky": true, "periwinkle": true, "lavender": true, "pink": true,
+}
 
 // Allowed ranges for the ticket length limits. The upper bounds are what the
 // server's request size limits are built around.
@@ -65,9 +105,13 @@ const (
 	keyIncidentTree         = "tickets.incident_tree"
 	keyAgentGroups          = "users.agent_groups"
 	keyBackground           = "appearance.background"
+	keyAccent               = "appearance.accent"
 	keySensitiveMode        = "appearance.sensitive_mode"
 	keySensitiveMessage     = "appearance.sensitive_message"
 	keyRequireTwoFactor     = "users.require_two_factor"
+	keyCompanyName          = "branding.company_name"
+	keyEmailNotifications   = "users.email_notifications"
+	keyLogoFile             = "branding.logo_file"
 )
 
 // DefaultSettings are used for any setting that hasn't been saved.
@@ -82,9 +126,11 @@ func DefaultSettings() Settings {
 		IncidentTree:         true,
 		AgentGroups:          false,
 		Background:           "none",
+		Accent:               "coral",
 		SensitiveMode:        false,
 		SensitiveMessage:     DefaultSensitiveMessage,
 		RequireTwoFactor:     true,
+		EmailNotifications:   true,
 	}
 }
 
@@ -125,6 +171,10 @@ func (s *Store) Settings(ctx context.Context) (Settings, error) {
 			if Backgrounds[value] {
 				st.Background = value
 			}
+		case keyAccent:
+			if Accents[value] {
+				st.Accent = value
+			}
 		case keyRequireTwoFactor:
 			st.RequireTwoFactor, _ = strconv.ParseBool(value)
 		case keyAgentGroups:
@@ -135,8 +185,15 @@ func (s *Store) Settings(ctx context.Context) (Settings, error) {
 			if n, err := strconv.Atoi(value); err == nil {
 				st.DescriptionMaxLength = n
 			}
+		case keyEmailNotifications:
+			st.EmailNotifications, _ = strconv.ParseBool(value)
+		case keyCompanyName:
+			st.CompanyName = value
+		case keyLogoFile:
+			st.LogoFile = value
 		}
 	}
+	st.LogoURL = BrandingLogoURL(st.LogoFile)
 	return st, rows.Err()
 }
 
@@ -152,9 +209,12 @@ type SettingsUpdate struct {
 	IncidentTree         *bool
 	AgentGroups          *bool
 	Background           *string
+	Accent               *string
 	SensitiveMode        *bool
 	SensitiveMessage     *string
 	RequireTwoFactor     *bool
+	CompanyName          *string
+	EmailNotifications   *bool
 }
 
 func (s *Store) UpdateSettings(ctx context.Context, u SettingsUpdate) (Settings, error) {
@@ -186,6 +246,9 @@ func (s *Store) UpdateSettings(ctx context.Context, u SettingsUpdate) (Settings,
 	if u.Background != nil {
 		values[keyBackground] = *u.Background
 	}
+	if u.Accent != nil {
+		values[keyAccent] = *u.Accent
+	}
 	if u.RequireTwoFactor != nil {
 		values[keyRequireTwoFactor] = strconv.FormatBool(*u.RequireTwoFactor)
 	}
@@ -197,6 +260,12 @@ func (s *Store) UpdateSettings(ctx context.Context, u SettingsUpdate) (Settings,
 	}
 	if u.DescriptionMaxLength != nil {
 		values[keyDescriptionMaxLength] = strconv.Itoa(*u.DescriptionMaxLength)
+	}
+	if u.EmailNotifications != nil {
+		values[keyEmailNotifications] = strconv.FormatBool(*u.EmailNotifications)
+	}
+	if u.CompanyName != nil {
+		values[keyCompanyName] = *u.CompanyName
 	}
 
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -217,6 +286,27 @@ func (s *Store) UpdateSettings(ctx context.Context, u SettingsUpdate) (Settings,
 		return Settings{}, err
 	}
 	return s.Settings(ctx)
+}
+
+// SetLogoFile stores the company logo's file name ("" removes it) and
+// returns the previous one, so the caller can delete the replaced file.
+func (s *Store) SetLogoFile(ctx context.Context, file string) (previous string, err error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return "", err
+	}
+	defer tx.Rollback()
+	err = tx.QueryRowContext(ctx, `SELECT value FROM app_settings WHERE key = ?`, keyLogoFile).Scan(&previous)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return "", err
+	}
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)
+		ON CONFLICT (key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+		keyLogoFile, file, time.Now().Unix()); err != nil {
+		return "", err
+	}
+	return previous, tx.Commit()
 }
 
 // HasActiveCategories reports whether any non-archived category exists.

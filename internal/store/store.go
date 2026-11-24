@@ -32,20 +32,24 @@ type User struct {
 	TwoFactorEnabled bool   `json:"twoFactorEnabled"`
 	TOTPSecret       string `json:"-"`
 	TOTPLastStep     int64  `json:"-"`
+	// EmailNotifications is the user's own choice to get notification emails.
+	EmailNotifications bool `json:"emailNotifications"`
+	// EmailEvents is which kinds of event they want emails about.
+	EmailEvents EmailEvents `json:"emailEvents"`
 	// TwoFactor says what this session still has to do: "verify" (enter a
 	// code after the password), "setup" (2FA is mandatory but not set up),
 	// or "" when nothing. Set by the server, not stored.
 	TwoFactor string `json:"twoFactor"`
 }
 
-const userCols = `u.id, u.email, u.name, u.role, u.password_hash, u.created_at, u.must_change_password, u.avatar, u.totp_enabled, u.totp_secret, u.totp_last_step`
+const userCols = `u.id, u.email, u.name, u.role, u.password_hash, u.created_at, u.must_change_password, u.avatar, u.totp_enabled, u.totp_secret, u.totp_last_step, u.email_notifications, u.email_events`
 
 type scanner interface{ Scan(dest ...any) error }
 
 func scanUser(row scanner) (User, error) {
 	var u User
 	var created int64
-	err := row.Scan(&u.ID, &u.Email, &u.Name, &u.Role, &u.PasswordHash, &created, &u.MustChangePassword, &u.Avatar, &u.TwoFactorEnabled, &u.TOTPSecret, &u.TOTPLastStep)
+	err := row.Scan(&u.ID, &u.Email, &u.Name, &u.Role, &u.PasswordHash, &created, &u.MustChangePassword, &u.Avatar, &u.TwoFactorEnabled, &u.TOTPSecret, &u.TOTPLastStep, &u.EmailNotifications, &u.EmailEvents)
 	if errors.Is(err, sql.ErrNoRows) {
 		return User{}, ErrNotFound
 	}
@@ -118,7 +122,7 @@ func (s *Store) SessionByToken(ctx context.Context, tokenHash string) (Session, 
 	var created int64
 	u := &sess.User
 	err := row.Scan(&u.ID, &u.Email, &u.Name, &u.Role, &u.PasswordHash, &created, &u.MustChangePassword, &u.Avatar,
-		&u.TwoFactorEnabled, &u.TOTPSecret, &u.TOTPLastStep, &sess.MFAPending, &sess.Remember)
+		&u.TwoFactorEnabled, &u.TOTPSecret, &u.TOTPLastStep, &u.EmailNotifications, &u.EmailEvents, &sess.MFAPending, &sess.Remember)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Session{}, ErrNotFound
 	} else if err != nil {

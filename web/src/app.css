@@ -11,6 +11,17 @@
 	--color-primary-600: #cf5959;
 	--color-primary-950: #2a1414;
 
+	/*
+	 * Pastel red for errors, deletes and urgent tickets. Fixed, so it still
+	 * means "danger" whichever accent colour an admin picks.
+	 */
+	--color-danger-200: #f8c9c9;
+	--color-danger-300: #f4aaaa;
+	--color-danger-400: #f08f8f;
+	--color-danger-500: #e57373;
+	--color-danger-600: #cf5959;
+	--color-danger-950: #2a1414;
+
 	/* Dark neutrals */
 	--color-ink-950: #0d0d10;
 	--color-ink-900: #141418;
@@ -57,6 +68,8 @@
 
 	--color-primary-200: #a83b3b;
 	--color-primary-300: #d35f5f;
+	--color-danger-200: #a83b3b;
+	--color-danger-300: #d35f5f;
 
 	--color-shade: #6b6b7a;
 }
@@ -142,6 +155,125 @@ input:-webkit-autofill:focus {
 	}
 }
 
+/*
+ * Accent colours (chosen by an admin in Lithium settings → Appearance). Coral
+ * is the default palette above; each other accent swaps the primary scale,
+ * plus deeper 200/300 shades for text in light mode. Keep the names in sync
+ * with $lib/accents.ts and the server's Accents list.
+ */
+:root[data-accent='peach'] {
+	--color-primary-50: #fef5ef;
+	--color-primary-100: #fde8db;
+	--color-primary-200: #fbd0b5;
+	--color-primary-300: #f8b48a;
+	--color-primary-400: #f59e6b;
+	--color-primary-500: #ea8550;
+	--color-primary-600: #d26c38;
+	--color-primary-950: #2b1a0f;
+}
+:root[data-theme='light'][data-accent='peach'] {
+	--color-primary-200: #9a4a1c;
+	--color-primary-300: #c2612a;
+}
+:root[data-accent='butter'] {
+	--color-primary-50: #fefbec;
+	--color-primary-100: #fdf4cf;
+	--color-primary-200: #fae79f;
+	--color-primary-300: #f6d773;
+	--color-primary-400: #f2c94c;
+	--color-primary-500: #e3b434;
+	--color-primary-600: #c79a1e;
+	--color-primary-950: #2a220a;
+}
+:root[data-theme='light'][data-accent='butter'] {
+	--color-primary-200: #7a5c00;
+	--color-primary-300: #9a7400;
+}
+:root[data-accent='mint'] {
+	--color-primary-50: #effbf5;
+	--color-primary-100: #d7f5e6;
+	--color-primary-200: #b0ebcf;
+	--color-primary-300: #86dfb5;
+	--color-primary-400: #6dd3a3;
+	--color-primary-500: #4fbf8b;
+	--color-primary-600: #37a573;
+	--color-primary-950: #0f2419;
+}
+:root[data-theme='light'][data-accent='mint'] {
+	--color-primary-200: #1d6b47;
+	--color-primary-300: #2a8a5d;
+}
+:root[data-accent='aqua'] {
+	--color-primary-50: #eefbfa;
+	--color-primary-100: #d3f4f1;
+	--color-primary-200: #a8e9e3;
+	--color-primary-300: #7fdbd2;
+	--color-primary-400: #6fcfc4;
+	--color-primary-500: #52b9ad;
+	--color-primary-600: #3a9e93;
+	--color-primary-950: #0d2422;
+}
+:root[data-theme='light'][data-accent='aqua'] {
+	--color-primary-200: #0f6b63;
+	--color-primary-300: #1a8a80;
+}
+:root[data-accent='sky'] {
+	--color-primary-50: #f0f7ff;
+	--color-primary-100: #dcebfe;
+	--color-primary-200: #b9d7fd;
+	--color-primary-300: #95c1fa;
+	--color-primary-400: #7fb2f7;
+	--color-primary-500: #5f98ea;
+	--color-primary-600: #467ed4;
+	--color-primary-950: #0f1a2b;
+}
+:root[data-theme='light'][data-accent='sky'] {
+	--color-primary-200: #1f56a8;
+	--color-primary-300: #2f6fcc;
+}
+:root[data-accent='periwinkle'] {
+	--color-primary-50: #f3f3fe;
+	--color-primary-100: #e4e5fd;
+	--color-primary-200: #c9cbfb;
+	--color-primary-300: #abaef7;
+	--color-primary-400: #9a9ef4;
+	--color-primary-500: #7f83e8;
+	--color-primary-600: #6669d2;
+	--color-primary-950: #16172e;
+}
+:root[data-theme='light'][data-accent='periwinkle'] {
+	--color-primary-200: #3f41b0;
+	--color-primary-300: #5558cc;
+}
+:root[data-accent='lavender'] {
+	--color-primary-50: #f7f2fe;
+	--color-primary-100: #ece1fc;
+	--color-primary-200: #d8c3f8;
+	--color-primary-300: #c2a4f3;
+	--color-primary-400: #b48ff0;
+	--color-primary-500: #9d72e3;
+	--color-primary-600: #8558cc;
+	--color-primary-950: #1f1430;
+}
+:root[data-theme='light'][data-accent='lavender'] {
+	--color-primary-200: #6a35b0;
+	--color-primary-300: #8450cc;
+}
+:root[data-accent='pink'] {
+	--color-primary-50: #fdf2f8;
+	--color-primary-100: #fbe2ef;
+	--color-primary-200: #f7c5df;
+	--color-primary-300: #f2a5cd;
+	--color-primary-400: #ef91c1;
+	--color-primary-500: #e374ad;
+	--color-primary-600: #cb5893;
+	--color-primary-950: #2b1220;
+}
+:root[data-theme='light'][data-accent='pink'] {
+	--color-primary-200: #a62d6c;
+	--color-primary-300: #c7468a;
+}
+
 /* Staff-only notes in a ticket's conversation: amber card. Pair with .tag-amber and border-dashed. */
 @layer components {
 	.internal-note {
@@ -153,8 +285,8 @@ input:-webkit-autofill:focus {
 /* Incident tree: urgent tickets (and the incident itself) get a red outline. */
 @layer components {
 	.urgent-card {
-		border-color: var(--color-primary-300);
-		box-shadow: 0 0 0 var(--ring-width, 0px) var(--color-primary-300);
+		border-color: var(--color-danger-300);
+		box-shadow: 0 0 0 var(--ring-width, 0px) var(--color-danger-300);
 	}
 }
 

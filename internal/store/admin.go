@@ -47,7 +47,7 @@ func (s *Store) ListUsers(ctx context.Context, q string) ([]AdminUser, error) {
 	for rows.Next() {
 		var u AdminUser
 		var created int64
-		if err := rows.Scan(&u.ID, &u.Email, &u.Name, &u.Role, &u.PasswordHash, &created, &u.MustChangePassword, &u.Avatar, &u.TwoFactorEnabled, &u.TOTPSecret, &u.TOTPLastStep, &u.PendingReset, &u.TicketCount, &u.AssignedCount); err != nil {
+		if err := rows.Scan(&u.ID, &u.Email, &u.Name, &u.Role, &u.PasswordHash, &created, &u.MustChangePassword, &u.Avatar, &u.TwoFactorEnabled, &u.TOTPSecret, &u.TOTPLastStep, &u.EmailNotifications, &u.EmailEvents, &u.PendingReset, &u.TicketCount, &u.AssignedCount); err != nil {
 			return nil, err
 		}
 		u.AvatarURL = AvatarURL(u.ID, u.Avatar)

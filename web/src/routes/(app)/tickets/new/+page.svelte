@@ -112,7 +112,7 @@
 		<!-- Main -->
 		<div class="space-y-5 rounded-xl border border-ink-800 bg-ink-900/60 p-5 sm:p-6">
 			{#if error}
-				<p role="alert" class="rounded-lg border border-primary-400/25 bg-primary-400/10 px-3 py-2.5 text-sm text-primary-200">
+				<p role="alert" class="rounded-lg border border-danger-400/25 bg-danger-400/10 px-3 py-2.5 text-sm text-danger-200">
 					{error}
 				</p>
 			{/if}

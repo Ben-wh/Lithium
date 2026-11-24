@@ -2,8 +2,12 @@
 	import '../app.css';
 	import { page } from '$app/state';
 	import SensitiveBanner from '$lib/components/SensitiveBanner.svelte';
+	import { applyAccent } from '$lib/accents';
 
 	let { data, children } = $props();
+
+	// The admin's accent colour, on every page including sign-in.
+	$effect(() => applyAccent(data.branding.accent));
 
 	// Signed-in pages show the banner with the navbar (see (app)/+layout.svelte);
 	// the sign-in pages show it here.

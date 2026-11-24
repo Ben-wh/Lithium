@@ -1,3 +1,4 @@
+import type { Accent } from './accents';
 import type { Background } from './backgrounds';
 import type { CategoryColor } from './categories';
 
@@ -11,6 +12,10 @@ export type User = {
 	createdAt: string;
 	mustChangePassword: boolean;
 	twoFactorEnabled: boolean;
+	/** The user's own choice to get notification emails. */
+	emailNotifications: boolean;
+	/** Which kinds of event they want emails about. */
+	emailEvents: EmailEvent[];
 	/**
 	 * What this session still has to do: "verify" (enter a code after the
 	 * password), "setup" (2FA is mandatory but not set up yet), or "".
@@ -81,6 +86,10 @@ export const twoFactor = {
 	disable: (password: string) =>
 		request<void>('/api/auth/2fa/disable', { method: 'POST', body: JSON.stringify({ password }) })
 };
+
+/** Company name and logo set by an admin ("" when not set); readable before signing in. */
+export type Branding = { companyName: string; logoUrl: string; accent: Accent };
+export const publicBranding = (f?: Fetch) => request<Branding>('/api/public/branding', {}, f);
 
 /** The sensitive mode banner; readable before signing in. */
 export const publicBanner = (f?: Fetch) =>
@@ -342,11 +351,21 @@ export type Settings = {
 	agentGroups: boolean;
 	/** Workspace background pattern, chosen by an admin. */
 	background: Background;
+	/** Workspace pastel accent colour, chosen by an admin. */
+	accent: Accent;
 	/** Show a red banner with sensitiveMessage above the navbar on every page. */
 	sensitiveMode: boolean;
 	sensitiveMessage: string;
 	/** Everyone must set up an authenticator app before using Lithium. */
 	requireTwoFactor: boolean;
+	/** Shown instead of "Lithium" in the navbar and on the sign-in pages ("" = not set). */
+	companyName: string;
+	/** The uploaded company logo, or "" to use the Lithium logo. Change with adminBranding. */
+	logoUrl: string;
+	/** Email people about their tickets as well as notifying them in the app. */
+	emailNotifications: boolean;
+	/** Read-only: whether the server has SMTP set up (LITHIUM_SMTP_HOST). */
+	emailConfigured: boolean;
 };
 
 /** Ranges admins can set the ticket length limits to (the server enforces the same). */
@@ -358,8 +377,24 @@ export const LENGTH_LIMITS = {
 export const getSettings = (f?: Fetch) => request<Settings>('/api/settings', {}, f);
 
 export const adminSettings = {
-	update: (s: Partial<Settings>) =>
+	update: (s: Partial<Omit<Settings, 'logoUrl' | 'emailConfigured'>>) =>
 		request<Settings>('/api/admin/settings', { method: 'PATCH', body: JSON.stringify(s) })
+};
+
+/** Admin only: email the signed-in admin now, to check the SMTP settings. */
+export const sendTestEmail = () =>
+	request<{ sentTo: string }>('/api/admin/email/test', { method: 'POST', body: '{}' });
+
+export const COMPANY_NAME_MAX = 60;
+export const MAX_LOGO_BYTES = 2 * 1024 * 1024;
+
+export const adminBranding = {
+	uploadLogo: (file: File) => {
+		const form = new FormData();
+		form.append('image', file, file.name);
+		return request<Settings>('/api/admin/branding/logo', { method: 'POST', body: form });
+	},
+	removeLogo: () => request<Settings>('/api/admin/branding/logo', { method: 'DELETE' })
 };
 
 // --- Profile ---
@@ -369,7 +404,14 @@ export const PRESET_AVATARS = 10;
 export const presetAvatarUrl = (n: number) => `/avatars/${n}.svg`;
 export const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
 
+/** Kinds of event people can choose to get emails about (the server checks the same list). */
+export const EMAIL_EVENTS = ['replies', 'mentions', 'assigned', 'updates'] as const;
+export type EmailEvent = (typeof EMAIL_EVENTS)[number];
+
 export const profile = {
+	/** Change your own notification email choices; fields left out stay as they are. */
+	setEmailPreferences: (p: { enabled?: boolean; events?: EmailEvent[] }) =>
+		request<User>('/api/profile/email-notifications', { method: 'PUT', body: JSON.stringify(p) }),
 	/** A built-in avatar (1–10), or 0 to go back to initials. */
 	setPresetAvatar: (preset: number) =>
 		request<User>('/api/profile/avatar', { method: 'PUT', body: JSON.stringify({ preset }) }),

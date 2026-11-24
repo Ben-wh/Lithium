@@ -1,9 +1,10 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { invalidate, invalidateAll } from '$app/navigation';
-	import { adminSettings, getSettings, type Settings } from '$lib/api';
+	import { adminSettings, ApiError, getSettings, sendTestEmail, type Settings } from '$lib/api';
 	import Icon from '$lib/components/Icon.svelte';
 	import Toggle from '$lib/components/Toggle.svelte';
+	import Modal from '$lib/components/Modal.svelte';
 
 	let settings = $state<Settings | null>(null);
 	let loadFailed = $state(false);
@@ -18,6 +19,42 @@
 			loadFailed = true;
 		}
 	});
+
+	// --- Test email: sent straight away, so SMTP mistakes show up here ---
+	let testState = $state<'idle' | 'sending' | 'sent' | 'error'>('idle');
+	let testMessage = $state('');
+
+	async function testEmail() {
+		testState = 'sending';
+		try {
+			const { sentTo } = await sendTestEmail();
+			testState = 'sent';
+			testMessage = `Sent to ${sentTo}. If it doesn't arrive, check your spam folder.`;
+		} catch (e) {
+			testState = 'error';
+			const reason = e instanceof ApiError ? e.message : 'something went wrong';
+			testMessage = reason.charAt(0).toUpperCase() + reason.slice(1) + '.';
+		}
+	}
+
+	// Turning mandatory 2FA off weakens everyone's sign-in, so it asks first.
+	// The switch stays on until the admin confirms.
+	let confirmDisable2FA = $state(false);
+
+	function onTwoFactorChange(on: boolean) {
+		if (on) {
+			save({ requireTwoFactor: true }, () => settings && (settings.requireTwoFactor = false));
+			return;
+		}
+		if (settings) settings.requireTwoFactor = true;
+		confirmDisable2FA = true;
+	}
+
+	function disableTwoFactor() {
+		confirmDisable2FA = false;
+		if (settings) settings.requireTwoFactor = false;
+		save({ requireTwoFactor: false }, () => settings && (settings.requireTwoFactor = true));
+	}
 
 	// Switches save as soon as they're changed; on failure they flip back.
 	async function save(patch: Partial<Settings>, revert: () => void) {
@@ -48,20 +85,20 @@
 			{:else if status === 'saved'}
 				<span class="flex items-center gap-1 text-ink-400"><Icon name="check" class="size-3.5 text-primary-300" /> Saved</span>
 			{:else if status === 'error'}
-				<span class="text-primary-300">Couldn't save. Try again.</span>
+				<span class="text-danger-300">Couldn't save. Try again.</span>
 			{/if}
 		</span>
 	</div>
 	<div class="px-5 py-4">
 		{#if loadFailed}
-			<p class="text-sm text-primary-200">Couldn't load settings.</p>
+			<p class="text-sm text-danger-200">Couldn't load settings.</p>
 		{:else if !settings}
 			<p class="text-sm text-ink-500">Loading…</p>
 		{:else}
 			<Toggle
 				bind:checked={settings.requireTwoFactor}
 				disabled={saving}
-				onchange={(on) => save({ requireTwoFactor: on }, () => settings && (settings.requireTwoFactor = !on))}
+				onchange={onTwoFactorChange}
 			>
 				Mandatory two-factor authentication
 				<span class="ml-1.5 text-xs font-semibold text-red-500">Highly recommended</span>
@@ -71,6 +108,44 @@
 					from their profile.
 				{/snippet}
 			</Toggle>
+			<div class="my-4 h-px bg-ink-800"></div>
+			<Toggle
+				bind:checked={settings.emailNotifications}
+				disabled={saving || !settings.emailConfigured}
+				onchange={(on) => save({ emailNotifications: on }, () => settings && (settings.emailNotifications = !on))}
+			>
+				Email notifications
+				{#snippet description()}
+					{#if settings?.emailConfigured}
+						Email people about replies, assignments, mentions and changes on their tickets, as well as notifying
+						them in the app. Everyone can turn their own emails off from their profile. Emails never include reply
+						text, and leave out ticket subjects while sensitive mode is on.
+					{:else}
+						Email isn't set up on this server. Set <code class="font-mono text-[12px]">LITHIUM_SMTP_HOST</code> and
+						the other <code class="font-mono text-[12px]">LITHIUM_SMTP_*</code> settings, then restart Lithium.
+					{/if}
+				{/snippet}
+			</Toggle>
+			{#if settings.emailConfigured}
+				<div class="mt-3 flex flex-wrap items-center gap-3">
+					<button
+						type="button"
+						onclick={testEmail}
+						disabled={testState === 'sending'}
+						class="inline-flex h-8 items-center gap-1.5 rounded-lg border border-ink-700 px-3 text-[13px] text-ink-200 transition hover:border-ink-500 hover:text-ink-100 disabled:cursor-not-allowed disabled:opacity-60"
+					>
+						<Icon name="bell" class="size-3.5" />
+						{testState === 'sending' ? 'Sending…' : 'Send test email'}
+					</button>
+					<span aria-live="polite" class="min-w-0 text-xs">
+						{#if testState === 'sent'}
+							<span class="text-ink-400">{testMessage}</span>
+						{:else if testState === 'error'}
+							<span class="break-words text-danger-300">{testMessage}</span>
+						{/if}
+					</span>
+				</div>
+			{/if}
 			<div class="my-4 h-px bg-ink-800"></div>
 			<Toggle
 				bind:checked={settings.disableCustomAvatars}
@@ -110,3 +185,33 @@
 		{/if}
 	</div>
 </div>
+
+<Modal
+	bind:open={confirmDisable2FA}
+	title="Turn off mandatory two-factor?"
+	description="People will be able to sign in with just a password unless they've set up two-factor themselves."
+>
+	<div class="flex items-start gap-3 rounded-lg border border-danger-400/25 bg-danger-400/10 px-3 py-2.5 text-sm text-danger-200">
+		<Icon name="shieldAlert" class="mt-0.5 size-4 shrink-0" />
+		<p>
+			Accounts without an authenticator app become easier to break into with a stolen or guessed password.
+			Anyone who already uses two-factor keeps it.
+		</p>
+	</div>
+	<div class="mt-5 flex justify-end gap-2">
+		<button
+			type="button"
+			onclick={() => (confirmDisable2FA = false)}
+			class="inline-flex h-9 items-center rounded-lg border border-ink-700 px-3.5 text-sm font-medium text-ink-200 transition hover:border-ink-500 hover:text-ink-100"
+		>
+			Keep it on
+		</button>
+		<button
+			type="button"
+			onclick={disableTwoFactor}
+			class="inline-flex h-9 items-center rounded-lg bg-danger-600 px-3.5 text-sm font-semibold text-white transition hover:bg-danger-500"
+		>
+			Turn off
+		</button>
+	</div>
+</Modal>
