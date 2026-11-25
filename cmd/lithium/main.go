@@ -32,7 +32,7 @@ func main() {
 
 	log := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
-	// `lithium seed-example` adds the example knowledge base article to an
+	// `lithium seed-example` adds the "How to use Lithium" guides to an
 	// existing install (new installs get it automatically). Handy for dev.
 	if len(os.Args) > 1 && os.Args[1] == "seed-example" {
 		if err := seedExample(cfg); err != nil {
@@ -165,11 +165,11 @@ func bootstrapAdmin(ctx context.Context, cfg config.Config, st *store.Store, log
 		log.Warn("allow first admin to skip two-factor", "err", err)
 	}
 
-	// A brand-new install also gets an example knowledge base article.
+	// A brand-new install also gets the "How to use Lithium" guides.
 	if added, err := seed.KnowledgeBase(ctx, st, u.ID); err != nil {
 		log.Warn("seed knowledge base", "err", err)
 	} else if added {
-		log.Info("added example knowledge base article")
+		log.Info("added How to use Lithium guides to the knowledge base")
 	}
 	return nil
 }
@@ -235,7 +235,7 @@ func healthcheck(addr string) int {
 	return 0
 }
 
-// seedExample adds the example knowledge base article, credited to the first
+// seedExample adds the "How to use Lithium" guides, credited to the first
 // admin. Like on a new install, it only does so if the knowledge base is empty.
 func seedExample(cfg config.Config) error {
 	ctx := context.Background()
@@ -262,7 +262,7 @@ func seedExample(cfg config.Config) error {
 		return err
 	}
 	if added {
-		fmt.Println("Added the example article to the knowledge base.")
+		fmt.Println("Added the How to use Lithium guides to the knowledge base.")
 	} else {
 		fmt.Println("The knowledge base already has content, so nothing was added.")
 	}

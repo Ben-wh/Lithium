@@ -29,7 +29,7 @@ type KBArticle struct {
 	Body        string           `json:"body,omitempty"`
 	Excerpt     string           `json:"excerpt,omitempty"`
 	Collection  *KBCollectionRef `json:"collection"`
-	Visibility  string           `json:"visibility"` // staff | everyone
+	Visibility  string           `json:"visibility"` // admins | staff | everyone
 	Status      string           `json:"status"`     // draft | published
 	Author      *UserRef         `json:"author"`
 	UpdatedBy   *UserRef         `json:"updatedBy"`
@@ -38,14 +38,50 @@ type KBArticle struct {
 	PublishedAt *time.Time       `json:"publishedAt"`
 }
 
-// publicOnly limits queries to what regular users may read.
-const kbPublicOnly = `a.status = 'published' AND a.visibility = 'everyone'`
+// KBReader is how much of the knowledge base someone may read.
+type KBReader int
 
-func (s *Store) ListKBCollections(ctx context.Context, staff bool) ([]KBCollection, error) {
-	visible := "1"
-	if !staff {
-		visible = kbPublicOnly
+const (
+	KBUser  KBReader = iota // published articles shared with everyone
+	KBStaff                 // also drafts and staff-only articles
+	KBAdmin                 // also admin-only articles
+)
+
+// KBReaderFor returns the reader level for a user's role.
+func KBReaderFor(role string) KBReader {
+	switch role {
+	case "admin":
+		return KBAdmin
+	case "agent":
+		return KBStaff
 	}
+	return KBUser
+}
+
+// CanRead reports whether this reader may see an article.
+func (r KBReader) CanRead(a KBArticle) bool {
+	switch r {
+	case KBAdmin:
+		return true
+	case KBStaff:
+		return a.Visibility != "admins"
+	}
+	return a.Status == "published" && a.Visibility == "everyone"
+}
+
+// visible is the SQL condition (on kb_articles a) matching CanRead.
+func (r KBReader) visible() string {
+	switch r {
+	case KBAdmin:
+		return "1"
+	case KBStaff:
+		return "a.visibility != 'admins'"
+	}
+	return "a.status = 'published' AND a.visibility = 'everyone'"
+}
+
+func (s *Store) ListKBCollections(ctx context.Context, reader KBReader) ([]KBCollection, error) {
+	visible := reader.visible()
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT c.id, c.name, c.description,
 		       (SELECT COUNT(*) FROM kb_articles a WHERE a.collection_id = c.id AND `+visible+`)
@@ -148,7 +184,7 @@ func scanKBArticle(row scanner) (KBArticle, error) {
 }
 
 type KBFilter struct {
-	Staff        bool   // staff see drafts and staff-only articles
+	Reader       KBReader
 	CollectionID int64  // 0 = any; -1 = no collection
 	Status       string // "" = any (staff only)
 	Query        string
@@ -159,9 +195,8 @@ type KBFilter struct {
 func (s *Store) ListKBArticles(ctx context.Context, f KBFilter) ([]KBArticle, error) {
 	var conds []string
 	var args []any
-	if !f.Staff {
-		conds = append(conds, kbPublicOnly)
-	} else if f.Status != "" {
+	conds = append(conds, f.Reader.visible())
+	if f.Reader != KBUser && f.Status != "" {
 		conds = append(conds, "a.status = ?")
 		args = append(args, f.Status)
 	}

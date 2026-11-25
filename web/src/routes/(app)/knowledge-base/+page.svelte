@@ -214,6 +214,10 @@
 										<span class="inline-flex items-center gap-1 rounded-full border border-ink-700 px-1.5 py-px text-[10px] font-medium text-ink-400">
 											<Icon name="lock" class="size-2.5" /> Staff only
 										</span>
+									{:else if isStaff && a.visibility === 'admins'}
+										<span class="inline-flex items-center gap-1 rounded-full border border-ink-700 px-1.5 py-px text-[10px] font-medium text-ink-400">
+											<Icon name="shield" class="size-2.5" /> Admins only
+										</span>
 									{/if}
 								</div>
 								<h3 class="mt-1.5 text-[15px] font-semibold text-ink-100 group-hover:text-primary-200">{a.title}</h3>

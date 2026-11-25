@@ -84,14 +84,19 @@
 		{ value: '', label: 'No collection' },
 		...data.collections.map((c) => ({ value: c.id, label: c.name }))
 	]);
-	const visibilityOptions: DropdownOption<KBVisibility>[] = [
+	// Only admins can make an article admin-only (agents can't open one).
+	const isAdmin = $derived(data.user?.role === 'admin');
+	const visibilityOptions = $derived<DropdownOption<KBVisibility>[]>([
+		...(isAdmin ? [{ value: 'admins' as const, label: 'Admins only' }] : []),
 		{ value: 'staff', label: 'Staff only' },
 		{ value: 'everyone', label: 'Everyone' }
-	];
+	]);
 	const visibilityHints: Record<KBVisibility, string> = {
+		admins: 'Only admins can read it',
 		staff: 'Only admins and agents can read it',
 		everyone: 'Users can read it too, once published'
 	};
+	const visibilityIcons = { admins: 'shield', staff: 'lock', everyone: 'users' } as const;
 </script>
 
 <svelte:head>
@@ -156,14 +161,14 @@
 				<label for="kb-visibility" class="mb-1 block text-xs text-ink-500">Who can read it</label>
 				<Dropdown id="kb-visibility" size="sm" menu="wide" bind:value={visibility} options={visibilityOptions}>
 					{#snippet item(opt)}
-						<Icon name={opt.value === 'staff' ? 'lock' : 'users'} class="size-4 shrink-0 text-ink-500" />
+						<Icon name={visibilityIcons[opt.value]} class="size-4 shrink-0 text-ink-500" />
 						<span class="min-w-0">
 							<span class="block text-[13px] text-ink-100">{opt.label}</span>
 							<span class="block text-xs text-ink-500">{visibilityHints[opt.value]}</span>
 						</span>
 					{/snippet}
 					{#snippet selected(opt)}
-						<Icon name={opt.value === 'staff' ? 'lock' : 'users'} class="size-4 shrink-0 text-ink-500" />
+						<Icon name={visibilityIcons[opt.value]} class="size-4 shrink-0 text-ink-500" />
 						<span class="text-ink-100">{opt.label}</span>
 					{/snippet}
 				</Dropdown>

@@ -152,3 +152,38 @@ func TestLinksMigrationKeepsComments(t *testing.T) {
 	mustExec(t, conn, `INSERT INTO ticket_comments (ticket_id, kind, event, new_value, created_at) VALUES (1, 'event', 'parent', '2', 7)`)
 	mustExec(t, conn, `UPDATE tickets SET parent_id = NULL WHERE id = 1`)
 }
+
+// The admin-visibility migration rebuilds kb_articles; existing articles and
+// their images must survive it, and 'admins' must then be allowed.
+func TestKBAdminVisibilityMigrationKeepsArticles(t *testing.T) {
+	ctx := context.Background()
+	path := filepath.Join(t.TempDir(), "test.db")
+	old, err := sql.Open("sqlite", "file:"+path+"?_pragma=foreign_keys(ON)")
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := newProvider(old)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := p.UpTo(ctx, 22); err != nil {
+		t.Fatal(err)
+	}
+	mustExec(t, old, `INSERT INTO kb_collections (id, name, created_at, updated_at) VALUES (1, 'C', 0, 0)`)
+	mustExec(t, old, `INSERT INTO kb_articles (id, title, body, collection_id, visibility, status, created_at, updated_at) VALUES (1, 'T', 'B', 1, 'everyone', 'published', 0, 0)`)
+	mustExec(t, old, `INSERT INTO kb_images (article_id, stored_name, content_type, size, created_at) VALUES (1, 'a.png', 'image/png', 1, 0)`)
+	old.Close()
+
+	conn, err := Open(ctx, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	var articles, images int
+	conn.QueryRow(`SELECT COUNT(*) FROM kb_articles WHERE visibility = 'everyone' AND collection_id = 1`).Scan(&articles)
+	conn.QueryRow(`SELECT COUNT(*) FROM kb_images`).Scan(&images)
+	if articles != 1 || images != 1 {
+		t.Fatalf("after migration: %d articles, %d images", articles, images)
+	}
+	mustExec(t, conn, `UPDATE kb_articles SET visibility = 'admins' WHERE id = 1`)
+}

@@ -21,16 +21,17 @@ const (
 
 func (s *Server) kbImageDir() string { return filepath.Join(s.cfg.DataDir, "kb-images") }
 
-// canReadKB reports whether a user may read an article: staff always,
-// everyone else only published articles shared with everyone.
+// canReadKB reports whether a user may read an article: admins always,
+// agents anything not admin-only, everyone else only published articles
+// shared with everyone.
 func canReadKB(u store.User, a store.KBArticle) bool {
-	return isStaff(u) || (a.Status == "published" && a.Visibility == "everyone")
+	return store.KBReaderFor(u.Role).CanRead(a)
 }
 
 // --- Collections ---
 
 func (s *Server) handleListKBCollections(w http.ResponseWriter, r *http.Request) {
-	cols, err := s.store.ListKBCollections(r.Context(), isStaff(userFrom(r.Context())))
+	cols, err := s.store.ListKBCollections(r.Context(), store.KBReaderFor(userFrom(r.Context()).Role))
 	if err != nil {
 		s.log.Error("list kb collections", "err", err)
 		writeError(w, http.StatusInternalServerError, "internal error")
@@ -102,7 +103,7 @@ func (s *Server) handleDeleteKBCollection(w http.ResponseWriter, r *http.Request
 
 func (s *Server) handleListKBArticles(w http.ResponseWriter, r *http.Request) {
 	qs := r.URL.Query()
-	f := store.KBFilter{Staff: isStaff(userFrom(r.Context())), Query: qs.Get("q")}
+	f := store.KBFilter{Reader: store.KBReaderFor(userFrom(r.Context()).Role), Query: qs.Get("q")}
 	switch v := qs.Get("collection"); v {
 	case "":
 	case "none":
@@ -128,6 +129,7 @@ func (s *Server) handleListKBArticles(w http.ResponseWriter, r *http.Request) {
 }
 
 // readableArticle loads an article the user may read, or writes a 404.
+// Staff may edit any article they can read, so it also guards changes.
 func (s *Server) readableArticle(w http.ResponseWriter, r *http.Request) (store.KBArticle, bool) {
 	id, ok := pathID(w, r)
 	if !ok {
@@ -175,10 +177,11 @@ func (s *Server) handleCreateKBArticle(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleUpdateKBArticle(w http.ResponseWriter, r *http.Request) {
-	id, ok := pathID(w, r)
+	existing, ok := s.readableArticle(w, r)
 	if !ok {
 		return
 	}
+	id := existing.ID
 	var req struct {
 		Title        string `json:"title"`
 		Body         string `json:"body"`
@@ -197,8 +200,11 @@ func (s *Server) handleUpdateKBArticle(w http.ResponseWriter, r *http.Request) {
 	case utf8.RuneCountInString(req.Body) > maxKBBody:
 		writeError(w, http.StatusBadRequest, "article is too long (max 100,000 characters)")
 		return
-	case req.Visibility != "staff" && req.Visibility != "everyone":
-		writeError(w, http.StatusBadRequest, "visibility must be staff or everyone")
+	case req.Visibility != "admins" && req.Visibility != "staff" && req.Visibility != "everyone":
+		writeError(w, http.StatusBadRequest, "visibility must be admins, staff or everyone")
+		return
+	case req.Visibility == "admins" && userFrom(r.Context()).Role != "admin":
+		writeError(w, http.StatusForbidden, "only admins can make an article admin-only")
 		return
 	case req.Status != "draft" && req.Status != "published":
 		writeError(w, http.StatusBadRequest, "status must be draft or published")
@@ -225,11 +231,11 @@ func (s *Server) handleUpdateKBArticle(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleDeleteKBArticle(w http.ResponseWriter, r *http.Request) {
-	id, ok := pathID(w, r)
+	a, ok := s.readableArticle(w, r)
 	if !ok {
 		return
 	}
-	files, err := s.store.DeleteKBArticle(r.Context(), id)
+	files, err := s.store.DeleteKBArticle(r.Context(), a.ID)
 	if errors.Is(err, store.ErrNotFound) {
 		writeError(w, http.StatusNotFound, "article not found")
 		return
@@ -251,18 +257,11 @@ func (s *Server) handleDeleteKBArticle(w http.ResponseWriter, r *http.Request) {
 // handleUploadKBImage attaches an image to an article (multipart field
 // "image") and returns the URL to use in the article's Markdown.
 func (s *Server) handleUploadKBImage(w http.ResponseWriter, r *http.Request) {
-	id, ok := pathID(w, r)
+	a, ok := s.readableArticle(w, r)
 	if !ok {
 		return
 	}
-	if _, err := s.store.KBArticleByID(r.Context(), id); errors.Is(err, store.ErrNotFound) {
-		writeError(w, http.StatusNotFound, "article not found")
-		return
-	} else if err != nil {
-		s.log.Error("get kb article", "err", err)
-		writeError(w, http.StatusInternalServerError, "internal error")
-		return
-	}
+	id := a.ID
 	r.Body = http.MaxBytesReader(w, r.Body, maxKBImageSize+1<<20)
 	if err := r.ParseMultipartForm(8 << 20); err != nil {
 		var tooBig *http.MaxBytesError

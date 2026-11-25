@@ -26,7 +26,7 @@
 
 	<header class="mt-4 flex flex-wrap items-start justify-between gap-4">
 		<div class="min-w-0">
-			{#if isStaff && (a.status === 'draft' || a.visibility === 'staff')}
+			{#if isStaff && (a.status === 'draft' || a.visibility !== 'everyone')}
 				<div class="mb-2 flex flex-wrap gap-1.5">
 					{#if a.status === 'draft'}
 						<span class="rounded-full border border-dashed border-ink-500/70 px-2 py-0.5 text-xs font-medium text-ink-200">Draft, not published</span>
@@ -34,6 +34,10 @@
 					{#if a.visibility === 'staff'}
 						<span class="inline-flex items-center gap-1 rounded-full border border-ink-700 px-2 py-0.5 text-xs font-medium text-ink-400">
 							<Icon name="lock" class="size-3" /> Staff only
+						</span>
+					{:else if a.visibility === 'admins'}
+						<span class="inline-flex items-center gap-1 rounded-full border border-ink-700 px-2 py-0.5 text-xs font-medium text-ink-400">
+							<Icon name="shield" class="size-3" /> Admins only
 						</span>
 					{/if}
 				</div>

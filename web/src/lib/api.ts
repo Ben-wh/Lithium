@@ -582,7 +582,7 @@ export const people = {
 // --- Knowledge base ---
 
 export type KBCollection = { id: number; name: string; description: string; articleCount: number };
-export type KBVisibility = 'staff' | 'everyone';
+export type KBVisibility = 'admins' | 'staff' | 'everyone';
 export type KBStatus = 'draft' | 'published';
 
 export type KBArticle = {

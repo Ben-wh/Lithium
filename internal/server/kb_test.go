@@ -179,3 +179,78 @@ func TestKnowledgeBase(t *testing.T) {
 		t.Fatalf("image after delete: %d", r.StatusCode)
 	}
 }
+
+func TestKnowledgeBaseAdminOnly(t *testing.T) {
+	ts := newTestServerWithDataDir(t, t.TempDir())
+	admin := signIn(t, ts.URL, "admin@example.com", "correct-horse")
+	alice, _ := newUser(t, ts.URL, admin, "Alice", "alice@example.com", "user")
+	agent, _ := newUser(t, ts.URL, admin, "Agent", "agent@example.com", "agent")
+
+	var col store.KBCollection
+	postJSON(t, admin, ts.URL+"/api/kb/collections", `{"name":"Runbooks"}`, &col)
+
+	// Agents can't make an article admin-only.
+	var mine store.KBArticle
+	postJSON(t, agent, ts.URL+"/api/kb/articles", `{}`, &mine)
+	if code := do(t, agent, "PUT", ts.URL+"/api/kb/articles/"+itoa(mine.ID),
+		`{"title":"T","body":"x","visibility":"admins","status":"published"}`); code != http.StatusForbidden {
+		t.Fatalf("agent making article admin-only: %d", code)
+	}
+
+	// An admin can.
+	var art store.KBArticle
+	postJSON(t, admin, ts.URL+"/api/kb/articles", `{"collectionId":`+itoa(col.ID)+`}`, &art)
+	url := ts.URL + "/api/kb/articles/" + itoa(art.ID)
+	code, imgURL := uploadKBImage(t, admin, ts.URL, art.ID, fakePNG)
+	if code != http.StatusCreated {
+		t.Fatalf("upload: %d", code)
+	}
+	if code := do(t, admin, "PUT", url, `{"title":"Restoring backups","body":"![x](`+imgURL+`)","collectionId":`+
+		itoa(col.ID)+`,"visibility":"admins","status":"published"}`); code != 200 {
+		t.Fatalf("admin saving admin-only article: %d", code)
+	}
+
+	listed := func(c *http.Client) int {
+		t.Helper()
+		var list []store.KBArticle
+		getJSON(t, c, ts.URL+"/api/kb/articles?collection="+itoa(col.ID), &list)
+		return len(list)
+	}
+	counted := func(c *http.Client) int {
+		t.Helper()
+		var cols []store.KBCollection
+		getJSON(t, c, ts.URL+"/api/kb/collections", &cols)
+		return cols[0].ArticleCount
+	}
+
+	// Admins see it; agents and users don't, anywhere.
+	var a store.KBArticle
+	if getJSON(t, admin, url, &a) != 200 || a.Visibility != "admins" || listed(admin) != 1 || counted(admin) != 1 {
+		t.Fatalf("admin can't see admin-only article: %+v", a)
+	}
+	for name, c := range map[string]*http.Client{"agent": agent, "user": alice} {
+		if code := getJSON(t, c, url, &store.KBArticle{}); code != http.StatusNotFound {
+			t.Fatalf("%s reading: %d", name, code)
+		}
+		if listed(c) != 0 || counted(c) != 0 {
+			t.Fatalf("%s sees admin-only article in lists", name)
+		}
+		if r := get(t, c, ts.URL+imgURL); r.StatusCode != http.StatusNotFound {
+			t.Fatalf("%s fetching image: %d", name, r.StatusCode)
+		}
+	}
+
+	// Agents can't change, add images to or delete it.
+	if code := do(t, agent, "PUT", url, `{"title":"T","body":"x","visibility":"staff","status":"published"}`); code != http.StatusNotFound {
+		t.Fatalf("agent editing admin-only article: %d", code)
+	}
+	if code, _ := uploadKBImage(t, agent, ts.URL, art.ID, fakePNG); code != http.StatusNotFound {
+		t.Fatalf("agent uploading to admin-only article: %d", code)
+	}
+	if code := do(t, agent, "DELETE", url, ""); code != http.StatusNotFound {
+		t.Fatalf("agent deleting admin-only article: %d", code)
+	}
+	if code := do(t, admin, "DELETE", url, ""); code != http.StatusNoContent {
+		t.Fatalf("admin deleting: %d", code)
+	}
+}

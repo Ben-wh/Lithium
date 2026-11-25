@@ -27,18 +27,43 @@ func TestKnowledgeBaseSeedsOnceIntoEmptyKB(t *testing.T) {
 	if err != nil || !added {
 		t.Fatalf("first seed: added=%v err=%v", added, err)
 	}
-	// Readable by regular users: published and shared with everyone.
-	public, err := st.ListKBArticles(ctx, store.KBFilter{Staff: false})
-	if err != nil || len(public) != 1 {
+
+	// Admins see all three guides.
+	all, err := st.ListKBArticles(ctx, store.KBFilter{Reader: store.KBAdmin})
+	if err != nil || len(all) != 3 {
+		t.Fatalf("admin articles: %v %+v", err, all)
+	}
+	want := map[string]string{
+		"How to use Lithium":             "## Raising a ticket",
+		"How to use Lithium: for agents": "## Replies and internal notes",
+		"How to use Lithium: for admins": "## Lockdown mode",
+	}
+	for _, s := range all {
+		a, err := st.KBArticleByID(ctx, s.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		heading, ok := want[a.Title]
+		if !ok || a.Collection == nil || a.Collection.Name != "Getting started" || a.Status != "published" ||
+			a.Author == nil || a.Author.ID != admin.ID || !strings.Contains(a.Body, heading) {
+			t.Fatalf("seeded article: %+v", a)
+		}
+		delete(want, a.Title)
+	}
+
+	// Agents see the user and agent guides; regular users only the user guide.
+	staff, err := st.ListKBArticles(ctx, store.KBFilter{Reader: store.KBStaff})
+	if err != nil || len(staff) != 2 {
+		t.Fatalf("staff articles: %v %+v", err, staff)
+	}
+	for _, a := range staff {
+		if a.Title == "How to use Lithium: for admins" {
+			t.Fatal("agents can see the admin guide")
+		}
+	}
+	public, err := st.ListKBArticles(ctx, store.KBFilter{Reader: store.KBUser})
+	if err != nil || len(public) != 1 || public[0].Title != "How to use Lithium" {
 		t.Fatalf("public articles: %v %+v", err, public)
-	}
-	a, err := st.KBArticleByID(ctx, public[0].ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if a.Title != "How to raise a good ticket" || a.Collection == nil || a.Collection.Name != "Getting started" ||
-		a.Author == nil || a.Author.ID != admin.ID || !strings.Contains(a.Body, "## Choosing a priority") {
-		t.Fatalf("seeded article: %+v", a)
 	}
 
 	// Never seeds twice, or into a knowledge base that already has content.
