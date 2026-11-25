@@ -86,10 +86,16 @@ func (s *Server) logRequests(next http.Handler) http.Handler {
 	})
 }
 
+// clientIP is the address a request came from. Behind a trusted proxy it's
+// the rightmost X-Forwarded-For entry: the address the proxy itself saw.
+// Entries further left are whatever the client sent, so they can be faked
+// (a proxy such as nginx with $proxy_add_x_forwarded_for appends to them
+// rather than replacing them) and must never be used for rate limiting or
+// the activity log.
 func (s *Server) clientIP(r *http.Request) string {
 	if s.cfg.TrustProxy {
-		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-			return strings.TrimSpace(strings.Split(xff, ",")[0])
+		if ip := lastForwardedFor(r.Header.Values("X-Forwarded-For")); ip != "" {
+			return ip
 		}
 	}
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
@@ -98,6 +104,24 @@ func (s *Server) clientIP(r *http.Request) string {
 	}
 	return host
 }
+
+// lastForwardedFor returns the rightmost valid IP address across all
+// X-Forwarded-For headers, or "" if the last entry isn't an IP address.
+func lastForwardedFor(values []string) string {
+	if len(values) == 0 {
+		return ""
+	}
+	parts := strings.Split(values[len(values)-1], ",")
+	last := strings.TrimSpace(parts[len(parts)-1])
+	if ip := net.ParseIP(last); ip != nil {
+		return ip.String()
+	}
+	return ""
+}
+
+// maxLimiterEntries caps how many IPs an ipLimiter tracks, so a flood of
+// addresses can't grow it without limit.
+const maxLimiterEntries = 50_000
 
 // ipLimiter allows a burst of 5 login attempts per IP, refilling one every 12s.
 type ipLimiter struct {
@@ -131,9 +155,23 @@ func (l *ipLimiter) allow(ip string) bool {
 	defer l.mu.Unlock()
 	e, ok := l.entries[ip]
 	if !ok {
+		if len(l.entries) >= maxLimiterEntries {
+			l.pruneIdle()
+		}
 		e = &limiterEntry{lim: rate.NewLimiter(rate.Every(12*time.Second), 5)}
 		l.entries[ip] = e
 	}
 	e.seen = time.Now()
 	return e.lim.Allow()
+}
+
+// pruneIdle drops entries whose limiter has fully refilled: forgetting them
+// changes nothing, since a new entry starts full too. Callers hold l.mu.
+func (l *ipLimiter) pruneIdle() {
+	now := time.Now()
+	for ip, e := range l.entries {
+		if e.lim.TokensAt(now) >= float64(e.lim.Burst()) {
+			delete(l.entries, ip)
+		}
+	}
 }

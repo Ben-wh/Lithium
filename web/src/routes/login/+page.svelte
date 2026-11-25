@@ -22,6 +22,13 @@
 	let loading = $state(false);
 	let error = $state('');
 
+	// A paused account says how long to wait; the per-IP limit is about a minute.
+	function tooManyMessage(err: ApiError) {
+		return err.message.includes('this account')
+			? err.message.charAt(0).toUpperCase() + err.message.slice(1) + '.'
+			: 'Too many attempts. Please wait a minute and try again.';
+	}
+
 	// Only follow same-site relative paths, never absolute URLs.
 	function nextPath() {
 		const next = page.url.searchParams.get('next');
@@ -45,8 +52,7 @@
 		} catch (err) {
 			if (err instanceof ApiError && err.status === 423) error = err.message;
 			else if (err instanceof ApiError && err.status === 401) error = 'Incorrect email or password.';
-			else if (err instanceof ApiError && err.status === 429)
-				error = 'Too many attempts. Please wait a minute and try again.';
+			else if (err instanceof ApiError && err.status === 429) error = tooManyMessage(err);
 			else error = 'Something went wrong. Please try again.';
 			loading = false;
 		}
@@ -73,7 +79,7 @@
 				error = 'Too many incorrect codes. Please sign in again.';
 				step = 'password';
 			} else if (err instanceof ApiError && err.status === 429) {
-				error = 'Too many attempts. Please wait a minute and try again.';
+				error = tooManyMessage(err);
 			} else {
 				error = 'Something went wrong. Please try again.';
 			}

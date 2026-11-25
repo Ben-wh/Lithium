@@ -68,13 +68,36 @@ func TestEmailSetUpInSettings(t *testing.T) {
 		t.Fatal("settings should report email as configured")
 	}
 
-	// Saving again without a password keeps the saved one.
+	// Saving again without a password keeps the saved one, for the same
+	// server and username (host case doesn't matter).
 	if code := do(t, admin, "PUT", ts.URL+"/api/admin/email",
-		`{"host":"smtp2.example.com","port":465,"username":"me","from":"help@example.com","tls":"tls"}`); code != 200 {
+		`{"host":"SMTP.example.com","port":587,"username":"me","from":"help2@example.com","tls":"starttls"}`); code != 200 {
 		t.Fatalf("resave: %d", code)
 	}
-	if c, _ := srv.store.EmailConfig(ctx); c.Password != "s3cret!" || c.Host != "smtp2.example.com" {
+	if c, _ := srv.store.EmailConfig(ctx); c.Password != "s3cret!" || c.From != "help2@example.com" {
 		t.Fatalf("password not kept: %+v", c)
+	}
+
+	// But it's never sent to a different server, port or username: the
+	// password has to be entered again.
+	for name, body := range map[string]string{
+		"host":     `{"host":"smtp.attacker.example","port":587,"username":"me","from":"help@example.com","tls":"starttls"}`,
+		"port":     `{"host":"smtp.example.com","port":2525,"username":"me","from":"help@example.com","tls":"starttls"}`,
+		"username": `{"host":"smtp.example.com","port":587,"username":"other","from":"help@example.com","tls":"starttls"}`,
+	} {
+		if code := do(t, admin, "PUT", ts.URL+"/api/admin/email", body); code != http.StatusBadRequest {
+			t.Fatalf("changed %s without the password: got %d", name, code)
+		}
+	}
+	if c, _ := srv.store.EmailConfig(ctx); !strings.EqualFold(c.Host, "smtp.example.com") || c.Port != 587 || c.Username != "me" || c.Password != "s3cret!" {
+		t.Fatalf("refused change was saved: %+v", c)
+	}
+	if code := do(t, admin, "PUT", ts.URL+"/api/admin/email",
+		`{"host":"smtp2.example.com","port":465,"username":"me","password":"n3w!","from":"help@example.com","tls":"tls"}`); code != 200 {
+		t.Fatalf("change server with password: %d", code)
+	}
+	if c, _ := srv.store.EmailConfig(ctx); c.Password != "n3w!" || c.Host != "smtp2.example.com" {
+		t.Fatalf("new server not saved: %+v", c)
 	}
 
 	// It's used straight away, with no restart: test email and the outbox.

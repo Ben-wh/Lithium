@@ -27,6 +27,14 @@
 	let password = $state('');
 	let from = $state('');
 	let baseUrl = $state('');
+	// The saved password is only kept while the server and username stay the
+	// same (the server refuses to send it anywhere else).
+	const keepsPassword = $derived(
+		!!current?.hasPassword &&
+			host.trim().toLowerCase() === current.host.toLowerCase() &&
+			Number(port) === current.port &&
+			username.trim() === current.username
+	);
 
 	function fill(es: EmailSettings) {
 		current = es;
@@ -279,7 +287,7 @@
 								bind:value={password}
 								autocomplete="new-password"
 								disabled={!username.trim()}
-								placeholder={current.hasPassword && username.trim() === current.username ? 'Saved (leave blank to keep)' : ''}
+								placeholder={keepsPassword ? 'Saved (leave blank to keep)' : current.hasPassword ? 'Enter it again for the new server' : ''}
 								class="field h-9 w-full text-[13px] disabled:opacity-50"
 							/>
 						</div>

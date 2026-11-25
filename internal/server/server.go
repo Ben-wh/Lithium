@@ -17,11 +17,12 @@ type Server struct {
 	cfg          config.Config
 	store        *store.Store
 	log          *slog.Logger
-	limiter      *ipLimiter  // login attempts
-	resetLimiter *ipLimiter  // password reset requests
-	mfaLimiter   *ipLimiter  // two-factor codes
-	dummyHash    string      // compared against when a login email doesn't exist, to keep timing uniform
-	mailer       mail.Sender // tests only: replaces the SMTP sender (see senderFor)
+	limiter      *ipLimiter       // login attempts
+	resetLimiter *ipLimiter       // password reset requests
+	mfaLimiter   *ipLimiter       // two-factor codes
+	throttle     *accountThrottle // wrong passwords and codes, per account
+	dummyHash    string           // compared against when a login email doesn't exist, to keep timing uniform
+	mailer       mail.Sender      // tests only: replaces the SMTP sender (see senderFor)
 }
 
 func New(cfg config.Config, st *store.Store, log *slog.Logger) (*Server, error) {
@@ -36,6 +37,7 @@ func New(cfg config.Config, st *store.Store, log *slog.Logger) (*Server, error) 
 		limiter:      newIPLimiter(),
 		resetLimiter: newIPLimiter(),
 		mfaLimiter:   newIPLimiter(),
+		throttle:     newAccountThrottle(),
 		dummyHash:    dummy,
 	}, nil
 }

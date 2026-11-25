@@ -6,7 +6,6 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/lithium/lithium/internal/auth"
 	"github.com/lithium/lithium/internal/store"
 )
 
@@ -50,8 +49,7 @@ func (s *Server) handleStartLockdown(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "type "+lockdownPhrase+" to confirm")
 		return
 	}
-	if ok, err := auth.VerifyPassword(req.Password, user.PasswordHash); err != nil || !ok {
-		writeError(w, http.StatusBadRequest, "password is incorrect")
+	if !s.checkPassword(w, r, user.ID, user.PasswordHash, req.Password, "password is incorrect") {
 		return
 	}
 	reason := strings.TrimSpace(req.Reason)
@@ -82,7 +80,10 @@ func (s *Server) handleStartLockdown(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusTooManyRequests, "too many attempts, try again shortly")
 			return
 		}
-		ok, err := s.checkSecondFactor(r.Context(), user, req.Code)
+		ok, handled, err := s.checkThrottledSecondFactor(w, r, user, req.Code)
+		if handled {
+			return
+		}
 		if err != nil {
 			s.log.Error("check two-factor code", "err", err)
 			writeError(w, http.StatusInternalServerError, "internal error")

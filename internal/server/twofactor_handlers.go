@@ -52,7 +52,10 @@ func (s *Server) handleVerifyTwoFactor(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	tokenHash := sessionFrom(r.Context())
-	ok, err := s.checkSecondFactor(r.Context(), user, req.Code)
+	ok, handled, err := s.checkThrottledSecondFactor(w, r, user, req.Code)
+	if handled {
+		return
+	}
 	if err != nil {
 		s.log.Error("check two-factor code", "err", err)
 		writeError(w, http.StatusInternalServerError, "internal error")
@@ -225,19 +228,39 @@ func newRecoveryCodes() (codes, hashes []string, err error) {
 	return codes, hashes, nil
 }
 
-// confirmPassword checks the password sent with a sensitive change.
-func confirmPassword(w http.ResponseWriter, r *http.Request, u store.User) bool {
+// confirmPassword checks the password sent with a sensitive change. Wrong
+// answers count against the account, like wrong sign-in passwords.
+func (s *Server) confirmPassword(w http.ResponseWriter, r *http.Request, u store.User) bool {
 	var req struct {
 		Password string `json:"password"`
 	}
 	if !decodeJSON(w, r, &req) {
 		return false
 	}
-	if ok, err := auth.VerifyPassword(req.Password, u.PasswordHash); err != nil || !ok {
-		writeError(w, http.StatusBadRequest, "password is incorrect")
-		return false
+	return s.checkPassword(w, r, u.ID, u.PasswordHash, req.Password, "password is incorrect")
+}
+
+// checkThrottledSecondFactor is checkSecondFactor with wrong codes counted
+// against the account, so many machines can't share the guessing. It writes
+// a 429 and returns handled=true when the account must wait first.
+func (s *Server) checkThrottledSecondFactor(w http.ResponseWriter, r *http.Request, u store.User, code string) (ok, handled bool, err error) {
+	key := secondFactorKey(u.ID)
+	if wait := s.throttle.wait(key); wait > 0 {
+		auditDetail(r.Context(), "refused: account paused after repeated wrong codes")
+		writeThrottled(w, wait)
+		return false, true, nil
 	}
-	return true
+	ok, err = s.checkSecondFactor(r.Context(), u, code)
+	if err != nil {
+		return false, false, err
+	}
+	if ok {
+		s.throttle.succeed(key)
+	} else if wait := s.throttle.fail(key); wait > 0 {
+		auditDetail(r.Context(), "account paused for %s after repeated wrong codes", wait)
+		s.log.Warn("account throttled: wrong two-factor codes", "user_id", u.ID, "ip", s.clientIP(r))
+	}
+	return ok, false, nil
 }
 
 // handleNewRecoveryCodes replaces the user's recovery codes.
@@ -247,7 +270,7 @@ func (s *Server) handleNewRecoveryCodes(w http.ResponseWriter, r *http.Request) 
 		writeError(w, http.StatusBadRequest, "two-factor authentication is off")
 		return
 	}
-	if !confirmPassword(w, r, user) {
+	if !s.confirmPassword(w, r, user) {
 		return
 	}
 	codes, hashes, err := newRecoveryCodes()
@@ -277,7 +300,7 @@ func (s *Server) handleDisableTwoFactor(w http.ResponseWriter, r *http.Request) 
 		writeError(w, http.StatusForbidden, "two-factor authentication is required in this workspace")
 		return
 	}
-	if !confirmPassword(w, r, user) {
+	if !s.confirmPassword(w, r, user) {
 		return
 	}
 	if err := s.store.ResetTwoFactor(r.Context(), user.ID, sessionFrom(r.Context())); err != nil {

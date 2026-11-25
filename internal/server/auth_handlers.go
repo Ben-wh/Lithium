@@ -69,17 +69,31 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 
 	user, err := s.store.UserByEmail(r.Context(), req.Email)
 	hash := user.PasswordHash
+	throttleKey := passwordKey(user.ID)
 	if errors.Is(err, store.ErrNotFound) {
 		hash = s.dummyHash
+		throttleKey = unknownEmailKey(req.Email)
 	} else if err != nil {
 		s.log.Error("lookup user", "err", err)
 		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	// Too many wrong passwords for this account (from anywhere): wait.
+	if wait := s.throttle.wait(throttleKey); wait > 0 {
+		auditDetail(r.Context(), "refused: account paused after repeated wrong passwords")
+		writeThrottled(w, wait)
 		return
 	}
 
 	ok, err := auth.VerifyPassword(req.Password, hash)
 	if err != nil {
 		s.log.Error("verify password", "err", err, "user_id", user.ID)
+	}
+	if ok && user.ID != 0 {
+		s.throttle.succeed(throttleKey)
+	} else if wait := s.throttle.fail(throttleKey); wait > 0 {
+		auditDetail(r.Context(), "account paused for %s after repeated wrong passwords", wait)
+		s.log.Warn("account throttled: wrong passwords", "email", req.Email, "ip", ip)
 	}
 	// In lockdown only the admin who started it gets in. Everyone else gets
 	// the same answer whether or not their password was right.
@@ -324,12 +338,9 @@ func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 	}
 	user := userFrom(r.Context())
 
-	if !user.MustChangePassword {
-		ok, err := auth.VerifyPassword(req.CurrentPassword, user.PasswordHash)
-		if err != nil || !ok {
-			writeError(w, http.StatusBadRequest, "current password is incorrect")
-			return
-		}
+	if !user.MustChangePassword &&
+		!s.checkPassword(w, r, user.ID, user.PasswordHash, req.CurrentPassword, "current password is incorrect") {
+		return
 	}
 	if msg := validatePassword(req.NewPassword); msg != "" {
 		writeError(w, http.StatusBadRequest, msg)

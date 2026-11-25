@@ -121,7 +121,8 @@ func (s *Server) handleSaveEmailSettings(w http.ResponseWriter, r *http.Request)
 		Host     string `json:"host"`
 		Port     int    `json:"port"`
 		Username string `json:"username"`
-		// Password: absent (null) keeps the saved one; "" removes it.
+		// Password: absent (null) keeps the saved one, but only while the
+		// server and username stay the same; "" removes it.
 		Password *string `json:"password"`
 		From     string  `json:"from"`
 		TLS      string  `json:"tls"`
@@ -147,6 +148,12 @@ func (s *Server) handleSaveEmailSettings(w http.ResponseWriter, r *http.Request)
 	}
 	if req.Password != nil {
 		c.Password = *req.Password
+	} else if saved.Password != "" && c.Username != "" && !sameSMTPLogin(saved, c) {
+		// The saved password is only ever sent to the server it was entered
+		// for. Otherwise anyone who could change the settings could point
+		// them at their own server and collect it with a test email.
+		writeError(w, http.StatusBadRequest, "enter the SMTP password again: the saved one isn't reused when the server or username changes")
+		return
 	}
 	if c.Username == "" {
 		c.Password = ""
@@ -197,4 +204,10 @@ func (s *Server) handleDeleteEmailSettings(w http.ResponseWriter, r *http.Reques
 	}
 	s.log.Info("email settings removed", "by", userFrom(r.Context()).ID)
 	s.handleGetEmailSettings(w, r)
+}
+
+// sameSMTPLogin reports whether c logs in to the same server, as the same
+// user, as saved.
+func sameSMTPLogin(saved, c store.EmailConfig) bool {
+	return strings.EqualFold(saved.Host, c.Host) && saved.Port == c.Port && saved.Username == c.Username
 }
