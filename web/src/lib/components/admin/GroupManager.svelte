@@ -133,7 +133,7 @@
 		<div class="mt-4 flex flex-wrap items-center gap-2.5 rounded-lg border border-ink-700 bg-ink-900 px-3.5 py-2.5 text-sm text-ink-200">
 			<Icon name="users" class="size-4 shrink-0 text-ink-500" />
 			<span class="flex-1">Groups are turned off, so every agent can see all tickets. You can set groups up now and turn them on when ready.</span>
-			<a href="?tab=settings&section=users" class="font-medium text-primary-300 hover:text-primary-200">Turn on in settings</a>
+			<a href="/settings?section=users" class="font-medium text-primary-300 hover:text-primary-200">Turn on in settings</a>
 		</div>
 	{/if}
 
@@ -227,7 +227,7 @@
 		<fieldset>
 			<legend class={labelClass}>Categories</legend>
 			{#if editorCategories.length === 0}
-				<p class="text-sm text-ink-500">No categories yet. Add some in Lithium settings → Tickets.</p>
+				<p class="text-sm text-ink-500">No categories yet. Add some in <a href="/settings?section=tickets" class="text-primary-300 hover:text-primary-200">Settings → Tickets</a>.</p>
 			{:else}
 				<div class="max-h-44 space-y-0.5 overflow-y-auto rounded-lg border border-ink-800 p-1.5">
 					{#each editorCategories as c (c.id)}

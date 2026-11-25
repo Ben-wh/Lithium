@@ -184,7 +184,7 @@ func startEmail(ctx context.Context, cfg config.Config, st *store.Store, srv *se
 		}
 		log.Info("email notifications on", "smtp", fmt.Sprintf("%s:%d", cfg.Mail.Host, cfg.Mail.Port), "tls", cfg.Mail.TLS, "from", cfg.Mail.From)
 	} else {
-		log.Info("email isn't set by LITHIUM_SMTP_*; admins can set it up in Admin → Settings → Email")
+		log.Info("email isn't set by LITHIUM_SMTP_*; admins can set it up in Settings → Email")
 	}
 	outbox := &mail.Outbox{
 		Store: st,

@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { invalidateAll } from '$app/navigation';
+	import { page } from '$app/state';
+	import CodeInput from '$lib/components/CodeInput.svelte';
 	import { ApiError, lockdown, LOCKDOWN_PHRASE, type Lockdown } from '$lib/api';
 	import { dateTimeFmt } from '$lib/format';
 	import Icon from '$lib/components/Icon.svelte';
@@ -31,6 +33,10 @@
 	let phrase = $state('');
 	let reason = $state('');
 	let password = $state('');
+	// With two-factor on, the last step also asks for a code.
+	const needsCode = $derived(page.data.user?.twoFactorEnabled ?? false);
+	let code = $state('');
+	let useRecovery = $state(false);
 	let starting = $state(false);
 	let startError = $state('');
 
@@ -39,6 +45,8 @@
 		phrase = '';
 		reason = '';
 		password = '';
+		code = '';
+		useRecovery = false;
 		startError = '';
 		step = 1;
 	}
@@ -57,13 +65,15 @@
 		starting = true;
 		startError = '';
 		try {
-			state_ = await lockdown.start(password, reason.trim());
+			state_ = await lockdown.start(password, reason.trim(), needsCode ? code : '');
 			step = 0;
 			password = '';
+			code = '';
 			await invalidateAll(); // shows the red frame
 		} catch (err) {
 			const msg = err instanceof ApiError ? err.message : 'something went wrong, please try again';
 			startError = msg.charAt(0).toUpperCase() + msg.slice(1) + '.';
+			code = ''; // codes can't be retried; enter the next one
 		} finally {
 			starting = false;
 		}
@@ -154,7 +164,9 @@
 		? 'This is for emergencies. Confirm each of these to continue (1 of 3).'
 		: step === 2
 			? `Type ${LOCKDOWN_PHRASE} to show you mean it.`
-			: 'Enter your password. Lockdown starts as soon as you confirm.'}
+			: needsCode
+				? 'Enter your password and a two-factor code. Lockdown starts as soon as you confirm.'
+				: 'Enter your password. Lockdown starts as soon as you confirm.'}
 >
 	{#if step === 1}
 		<div class="space-y-2.5">
@@ -218,6 +230,28 @@
 				autofocus
 				class="field h-9 w-full text-[13px]"
 			/>
+			{#if needsCode}
+				<div class="mt-4">
+					<div class="mb-1.5 flex items-baseline justify-between gap-3">
+						<span class="text-[13px] font-medium text-ink-200">
+							{useRecovery ? 'Recovery code' : 'Code from your authenticator app'}
+						</span>
+						<button
+							type="button"
+							onclick={() => {
+								useRecovery = !useRecovery;
+								code = '';
+							}}
+							class="text-xs text-ink-400 hover:text-primary-300"
+						>
+							{useRecovery ? 'Use your app instead' : 'Use a recovery code'}
+						</button>
+					</div>
+					{#key useRecovery}
+						<CodeInput bind:value={code} allowRecovery={useRecovery} disabled={starting} />
+					{/key}
+				</div>
+			{/if}
 			{#if startError}
 				<p role="alert" class="mt-3 text-sm text-danger-300">{startError}</p>
 			{/if}
@@ -225,7 +259,7 @@
 				<button type="button" onclick={() => (step = 2)} disabled={starting} class={btnSecondary}>Back</button>
 				<div class="flex gap-2">
 					<button type="button" onclick={() => (step = 0)} disabled={starting} class={btnSecondary}>Cancel</button>
-					<button type="submit" disabled={!password || starting} class={btnDanger}>
+					<button type="submit" disabled={!password || (needsCode && !code.trim()) || starting} class={btnDanger}>
 						<Icon name="lock" class="size-4" />
 						{starting ? 'Locking down…' : 'Lock everyone out now'}
 					</button>

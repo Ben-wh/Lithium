@@ -19,7 +19,7 @@
 		<span class="truncate">LOCKDOWN MODE · Signing in is turned off for everyone else</span>
 		{#if isAdmin}
 			<a
-				href="/admin?tab=settings&section=lockdown"
+				href="/settings?section=lockdown"
 				class="pointer-events-auto shrink-0 rounded bg-white/15 px-2 py-0.5 text-[11px] tracking-normal underline-offset-2 hover:bg-white/25"
 			>
 				Manage

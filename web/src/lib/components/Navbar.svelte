@@ -21,7 +21,8 @@
 		{ href: '/user-book', label: 'User book', icon: 'users', staffOnly: true },
 		{ href: '/knowledge-base', label: 'Knowledge base', icon: 'book' },
 		{ href: '/reports', label: 'Reports', icon: 'chart', staffOnly: true },
-		{ href: '/activity', label: 'Activity', icon: 'activity', adminOnly: true }
+		{ href: '/activity', label: 'Activity', icon: 'activity', adminOnly: true },
+		{ href: '/settings', label: 'Settings', icon: 'settings', adminOnly: true }
 	];
 	const links = $derived(
 		allLinks.filter(
@@ -30,6 +31,12 @@
 	);
 
 	const isAdmin = $derived(user.role === 'admin');
+
+	// Labels show once there's room for all of them; before that the links
+	// are icons with a tooltip. More links (admins) need a wider screen.
+	const labelClass = $derived(
+		links.length <= 3 ? 'inline' : links.length <= 5 ? 'hidden lg:inline' : 'hidden xl:inline'
+	);
 
 	function isActive(href: string) {
 		const p = page.url.pathname;
@@ -68,7 +75,7 @@
 <svelte:window onclick={onWindowClick} onkeydown={onKeydown} />
 
 <header class="sticky top-0 z-40 border-b border-ink-800 bg-ink-950/80 backdrop-blur-md">
-	<div class="mx-auto flex h-14 max-w-7xl items-center gap-6 px-4 sm:px-6">
+	<div class="mx-auto flex h-14 max-w-7xl items-center gap-4 px-4 sm:px-6 xl:gap-6">
 		<!-- Brand -->
 		<a
 			href="/"
@@ -88,14 +95,16 @@
 				<a
 					href={link.href}
 					aria-current={active ? 'page' : undefined}
+					aria-label={link.label}
+					title={link.label}
 					class={[
-						'relative flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition',
+						'relative flex items-center gap-2 rounded-md px-2.5 py-1.5 text-sm whitespace-nowrap transition',
 						'focus-visible:ring-2 focus-visible:ring-primary-400/40 focus-visible:outline-none',
 						active ? 'bg-ink-850 text-ink-100' : 'text-ink-400 hover:bg-ink-900 hover:text-ink-100'
 					]}
 				>
-					<Icon name={link.icon} class={['size-4', active ? 'text-primary-400' : ''].join(' ')} />
-					{link.label}
+					<Icon name={link.icon} class={['size-4 shrink-0', active ? 'text-primary-400' : ''].join(' ')} />
+					<span class={labelClass}>{link.label}</span>
 				</a>
 			{/each}
 		</nav>
@@ -103,7 +112,7 @@
 		<div class="ml-auto flex items-center gap-2">
 			<a
 				href="/tickets/new"
-				class="hidden h-8 items-center gap-1.5 rounded-md bg-primary-400 px-3 text-sm font-semibold text-primary-950 transition hover:bg-primary-300 focus-visible:ring-2 focus-visible:ring-primary-400/40 focus-visible:ring-offset-2 focus-visible:ring-offset-ink-950 focus-visible:outline-none sm:flex"
+				class="hidden h-8 items-center gap-1.5 rounded-md bg-primary-400 px-3 text-sm font-semibold whitespace-nowrap text-primary-950 transition hover:bg-primary-300 focus-visible:ring-2 focus-visible:ring-primary-400/40 focus-visible:ring-offset-2 focus-visible:ring-offset-ink-950 focus-visible:outline-none sm:flex"
 			>
 				<Icon name="plus" class="size-4" />
 				New ticket
@@ -114,7 +123,7 @@
 					href="/admin"
 					aria-current={isActive('/admin') ? 'page' : undefined}
 					class={[
-						'hidden h-8 items-center gap-1.5 rounded-md border px-3 text-sm transition sm:flex',
+						'hidden h-8 items-center gap-1.5 rounded-md border px-3 text-sm whitespace-nowrap transition sm:flex',
 						'focus-visible:ring-2 focus-visible:ring-primary-400/40 focus-visible:outline-none',
 						isActive('/admin')
 							? 'border-primary-400/50 bg-primary-400/10 text-primary-200'

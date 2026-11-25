@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"strconv"
 	"strings"
@@ -44,8 +45,12 @@ type Ticket struct {
 	Assignee    *UserRef     `json:"assignee"`
 	Category    *CategoryRef `json:"category"`
 	Attachments []Attachment `json:"attachments"`
-	CreatedAt   time.Time    `json:"createdAt"`
-	UpdatedAt   time.Time    `json:"updatedAt"`
+	// Fields are the template answers given when the ticket was raised, and
+	// TemplateName the template they came from ("" for none).
+	Fields       []TicketField `json:"fields"`
+	TemplateName string        `json:"templateName"`
+	CreatedAt    time.Time     `json:"createdAt"`
+	UpdatedAt    time.Time     `json:"updatedAt"`
 }
 
 type NewTicket struct {
@@ -56,6 +61,9 @@ type NewTicket struct {
 	RequesterID int64
 	CreatedBy   int64
 	Attachments []NewAttachment
+	// Fields and TemplateName record a template's answers (see Ticket).
+	Fields       []TicketField
+	TemplateName string
 }
 
 func nullID(id int64) sql.NullInt64 { return sql.NullInt64{Int64: id, Valid: id != 0} }
@@ -77,10 +85,17 @@ func (s *Store) CreateTicket(ctx context.Context, n NewTicket) (Ticket, error) {
 	defer tx.Rollback()
 
 	now := time.Now().Unix()
+	if n.Fields == nil {
+		n.Fields = []TicketField{}
+	}
+	fields, err := json.Marshal(n.Fields)
+	if err != nil {
+		return Ticket{}, err
+	}
 	res, err := tx.ExecContext(ctx, `
-		INSERT INTO tickets (subject, description, priority, category_id, requester_id, created_by, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		n.Subject, n.Description, n.Priority, nullID(n.CategoryID), n.RequesterID, n.CreatedBy, now, now)
+		INSERT INTO tickets (subject, description, priority, category_id, requester_id, created_by, created_at, updated_at, custom_fields, template_name)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		n.Subject, n.Description, n.Priority, nullID(n.CategoryID), n.RequesterID, n.CreatedBy, now, now, string(fields), n.TemplateName)
 	if err != nil {
 		return Ticket{}, err
 	}
@@ -112,13 +127,14 @@ func (s *Store) TicketByID(ctx context.Context, id int64) (Ticket, error) {
 	dest = append(dest, req.dest()...)
 	dest = append(dest, by.dest()...)
 	dest = append(dest, asg.dest()...)
-	dest = append(dest, &catID, &catName, &catColor)
+	var fields string
+	dest = append(dest, &catID, &catName, &catColor, &fields, &t.TemplateName)
 	err := s.db.QueryRowContext(ctx, `
 		SELECT t.id, t.subject, t.description, t.status, t.priority, t.created_at, t.updated_at,
 		       r.id, r.name, r.email, r.avatar,
 		       c.id, c.name, c.email, c.avatar,
 		       a.id, a.name, a.email, a.avatar,
-		       cat.id, cat.name, cat.color
+		       cat.id, cat.name, cat.color, t.custom_fields, t.template_name
 		FROM tickets t
 		JOIN users r ON r.id = t.requester_id
 		JOIN users c ON c.id = t.created_by
@@ -129,6 +145,9 @@ func (s *Store) TicketByID(ctx context.Context, id int64) (Ticket, error) {
 		return Ticket{}, ErrNotFound
 	} else if err != nil {
 		return Ticket{}, err
+	}
+	if err := json.Unmarshal([]byte(fields), &t.Fields); err != nil || t.Fields == nil {
+		t.Fields = []TicketField{}
 	}
 	t.CreatedAt = time.Unix(created, 0).UTC()
 	t.UpdatedAt = time.Unix(updated, 0).UTC()

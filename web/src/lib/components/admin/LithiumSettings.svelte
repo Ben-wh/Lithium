@@ -23,7 +23,6 @@
 
 	function href(id: SectionId) {
 		const url = new URL(page.url);
-		url.searchParams.set('tab', 'settings');
 		url.searchParams.set('section', id);
 		return url.pathname + url.search;
 	}

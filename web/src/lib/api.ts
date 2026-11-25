@@ -160,17 +160,74 @@ export const admin = {
 // --- Tickets ---
 
 export type CategoryRef = { id: number; name: string; color: CategoryColor };
-export type PublicCategory = CategoryRef & { description: string };
-export type Category = PublicCategory & { archived: boolean; ticketCount: number; createdAt: string };
+export type PublicCategory = CategoryRef & {
+	description: string;
+	/** The template that shapes the new-ticket form for this category (public list only). */
+	template?: TicketTemplate | null;
+};
+export type Category = PublicCategory & {
+	archived: boolean;
+	ticketCount: number;
+	/** Linked ticket template, or null. */
+	templateId: number | null;
+	createdAt: string;
+};
+
+// --- Ticket templates ---
+
+export type FieldType = 'text' | 'textarea' | 'number' | 'select' | 'checkbox' | 'date';
+export type DescriptionMode = 'required' | 'optional' | 'hidden';
+
+export type TemplateField = {
+	/** Stable across edits; leave empty for a new field and the server makes one. */
+	id: string;
+	label: string;
+	type: FieldType;
+	required: boolean;
+	help: string;
+	/** Choices, for "select" fields. */
+	options?: string[];
+};
+
+export type TicketTemplate = {
+	id: number;
+	name: string;
+	/** Shown above the form. */
+	intro: string;
+	descriptionMode: DescriptionMode;
+	/** "" keeps the usual default. */
+	defaultPriority: Priority | '';
+	fields: TemplateField[];
+	categoryCount: number;
+	createdAt: string;
+	updatedAt: string;
+};
+
+export type TemplateDraft = Pick<TicketTemplate, 'name' | 'intro' | 'descriptionMode' | 'defaultPriority' | 'fields'>;
+
+export const adminTemplates = {
+	list: () => request<TicketTemplate[]>('/api/admin/ticket-templates'),
+	create: (t: TemplateDraft) =>
+		request<TicketTemplate>('/api/admin/ticket-templates', { method: 'POST', body: JSON.stringify(t) }),
+	update: (id: number, t: TemplateDraft) =>
+		request<TicketTemplate>(`/api/admin/ticket-templates/${id}`, { method: 'PUT', body: JSON.stringify(t) }),
+	remove: (id: number) => request<void>(`/api/admin/ticket-templates/${id}`, { method: 'DELETE', body: '{}' })
+};
+
+/** One answer on a ticket, with its question copied in when it was raised. */
+export type TicketField = { label: string; type: FieldType; value: string };
 
 /** Active categories, for anyone raising a ticket. */
 export const listCategories = (f?: Fetch) => request<PublicCategory[]>('/api/categories', {}, f);
 
 export const adminCategories = {
 	list: () => request<Category[]>('/api/admin/categories'),
-	create: (c: { name: string; description: string; color: CategoryColor }) =>
+	create: (c: { name: string; description: string; color: CategoryColor; templateId?: number | null }) =>
 		request<Category>('/api/admin/categories', { method: 'POST', body: JSON.stringify(c) }),
-	update: (id: number, c: Partial<{ name: string; description: string; color: CategoryColor; archived: boolean }>) =>
+	update: (
+		id: number,
+		c: Partial<{ name: string; description: string; color: CategoryColor; archived: boolean; templateId: number | null }>
+	) =>
 		request<Category>(`/api/admin/categories/${id}`, { method: 'PATCH', body: JSON.stringify(c) }),
 	remove: (id: number) => request<void>(`/api/admin/categories/${id}`, { method: 'DELETE', body: '{}' })
 };
@@ -190,6 +247,10 @@ export type Ticket = {
 	assignee: UserRef | null;
 	category: CategoryRef | null;
 	attachments: Attachment[];
+	/** Template answers given when it was raised (only on a single ticket). */
+	fields?: TicketField[];
+	/** The template those came from, or "". */
+	templateName?: string;
 	createdAt: string;
 	updatedAt: string;
 };
@@ -211,6 +272,8 @@ export type NewTicket = {
 	categoryId?: number;
 	/** Staff only: raise on someone else's behalf. */
 	requesterId?: number;
+	/** Answers to the category's template, by field id. */
+	fields?: Record<string, string | boolean>;
 };
 
 export type TicketSummary = Omit<Ticket, 'description' | 'createdBy' | 'attachments'>;
@@ -368,7 +431,7 @@ export type Settings = {
 	logoUrl: string;
 	/** Email people about their tickets as well as notifying them in the app. */
 	emailNotifications: boolean;
-	/** Read-only: whether email is set up (by LITHIUM_SMTP_* or in Admin → Settings → Email). */
+	/** Read-only: whether email is set up (by LITHIUM_SMTP_* or in Settings → Email). */
 	emailConfigured: boolean;
 };
 
@@ -662,10 +725,11 @@ export const LOCKDOWN_PHRASE = 'LOCKDOWN';
 export const lockdown = {
 	get: () => request<Lockdown>('/api/admin/lockdown'),
 	/** Signs everyone else out and blocks sign-in for anyone but you. */
-	start: (password: string, reason: string) =>
+	/** code: an authenticator or recovery code, needed if you use two-factor. */
+	start: (password: string, reason: string, code = '') =>
 		request<Lockdown>('/api/admin/lockdown', {
 			method: 'POST',
-			body: JSON.stringify({ confirm: LOCKDOWN_PHRASE, password, reason })
+			body: JSON.stringify({ confirm: LOCKDOWN_PHRASE, password, reason, code })
 		}),
 	end: () => request<Lockdown>('/api/admin/lockdown/end', { method: 'POST', body: '{}' })
 };

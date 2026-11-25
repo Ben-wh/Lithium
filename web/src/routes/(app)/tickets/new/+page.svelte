@@ -30,12 +30,34 @@
 	$effect(() => {
 		if (categoryId !== '') categoryMissing = false;
 	});
+	// The chosen category's template adds fields and decides whether a
+	// description is needed. Answers are kept by field id, so switching
+	// category and back doesn't lose them.
+	const template = $derived(
+		categoryId === '' ? null : (data.categories.find((c) => c.id === categoryId)?.template ?? null)
+	);
+	const descriptionMode = $derived(template?.descriptionMode ?? 'required');
+	let answers = $state<Record<string, string | boolean>>({});
+	let missingField = $state<string | null>(null);
+
+	// A template can suggest a priority, unless the requester already picked one.
+	let priorityTouched = $state(false);
+	$effect(() => {
+		const suggested = template?.defaultPriority || 'normal';
+		if (!priorityTouched) priority = suggested;
+	});
+
 	let requester = $derived<UserRef | null>(data.presetRequester);
 	let error = $state('');
 	let submitting = $state(false);
 	let submitted = false;
 
-	const dirty = $derived(subject.trim() !== '' || description.trim() !== '' || images.length > 0);
+	const dirty = $derived(
+		subject.trim() !== '' ||
+			description.trim() !== '' ||
+			images.length > 0 ||
+			Object.values(answers).some((v) => v !== '' && v !== false)
+	);
 	const forSomeoneElse = $derived(requester !== null && requester.id !== user.id);
 
 	// Warn before throwing away a half-written ticket.
@@ -58,7 +80,18 @@
 			error = 'Choose a category so your ticket reaches the right team.';
 			return;
 		}
-		if (!description.trim()) {
+		for (const f of template?.fields ?? []) {
+			const v = answers[f.id];
+			const empty = f.type === 'checkbox' ? v !== true : typeof v !== 'string' || v.trim() === '';
+			if (f.required && empty) {
+				missingField = f.id;
+				error = f.type === 'checkbox' ? `Tick “${f.label}” to continue.` : `Fill in “${f.label}”.`;
+				document.getElementById(`field-${f.id}`)?.focus();
+				return;
+			}
+		}
+		missingField = null;
+		if (descriptionMode === 'required' && !description.trim()) {
 			error = 'Describe the problem or request.';
 			return;
 		}
@@ -66,10 +99,13 @@
 		try {
 			const t = await tickets.create({
 				subject,
-				description,
+				description: descriptionMode === 'hidden' ? '' : description,
 				priority,
 				categoryId: categoryId === '' ? undefined : categoryId,
-				requesterId: forSomeoneElse ? requester!.id : undefined
+				requesterId: forSomeoneElse ? requester!.id : undefined,
+				fields: template
+					? Object.fromEntries(template.fields.filter((f) => f.id in answers).map((f) => [f.id, answers[f.id]]))
+					: undefined
 			}, data.settings.allowImageUploads ? images : []);
 			submitted = true;
 			await goto(`/tickets/${t.id}?created=1`, { replaceState: true });
@@ -158,22 +194,107 @@
 				</div>
 			{/if}
 
+			{#if template}
+				{#if template.intro}
+					<div class="flex gap-2.5 rounded-lg border border-primary-400/25 bg-primary-400/5 px-3.5 py-3 text-sm text-ink-200">
+						<Icon name="book" class="mt-0.5 size-4 shrink-0 text-primary-300" />
+						<p class="whitespace-pre-line">{template.intro}</p>
+					</div>
+				{/if}
+				{#each template.fields as f (f.id)}
+					{@const invalid = missingField === f.id}
+					<div>
+						{#if f.type === 'checkbox'}
+							<label class="flex cursor-pointer items-start gap-2.5 text-sm text-ink-200">
+								<input
+									id="field-{f.id}"
+									type="checkbox"
+									checked={answers[f.id] === true}
+									onchange={(e) => {
+										answers[f.id] = e.currentTarget.checked;
+										if (missingField === f.id) missingField = null;
+									}}
+									class="mt-0.5 size-4 shrink-0 accent-primary-400"
+								/>
+								<span>
+									<span class="font-medium">{f.label}</span>
+									{#if f.required}<span class="text-primary-300"> *</span>{/if}
+									{#if f.help}<span class="mt-0.5 block text-xs text-ink-500">{f.help}</span>{/if}
+								</span>
+							</label>
+						{:else}
+							<label for="field-{f.id}" class={labelClass}>
+								{f.label}
+								{#if f.required}
+									<span class="font-normal text-primary-300">Required</span>
+								{:else}
+									<span class="font-normal text-ink-500">(optional)</span>
+								{/if}
+							</label>
+							{#if f.type === 'textarea'}
+								<textarea
+									id="field-{f.id}"
+									value={(answers[f.id] as string) ?? ''}
+									oninput={(e) => (answers[f.id] = e.currentTarget.value)}
+									maxlength="5000"
+									rows="4"
+									aria-invalid={invalid}
+									class="field h-auto resize-y py-2 leading-relaxed"
+								></textarea>
+							{:else if f.type === 'select'}
+								<select
+									id="field-{f.id}"
+									value={(answers[f.id] as string) ?? ''}
+									onchange={(e) => (answers[f.id] = e.currentTarget.value)}
+									aria-invalid={invalid}
+									class="field sm:max-w-sm"
+								>
+									<option value="">Choose…</option>
+									{#each f.options ?? [] as o (o)}<option value={o}>{o}</option>{/each}
+								</select>
+							{:else}
+								<input
+									id="field-{f.id}"
+									type={f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text'}
+									inputmode={f.type === 'number' ? 'decimal' : undefined}
+									step={f.type === 'number' ? 'any' : undefined}
+									value={(answers[f.id] as string) ?? ''}
+									oninput={(e) => (answers[f.id] = e.currentTarget.value)}
+									maxlength={f.type === 'text' ? 500 : undefined}
+									aria-invalid={invalid}
+									onkeydown={onKeydown}
+									class={['field', f.type !== 'text' && 'sm:max-w-sm']}
+								/>
+							{/if}
+							{#if f.help}<p class="mt-1.5 text-xs text-ink-500">{f.help}</p>{/if}
+						{/if}
+					</div>
+				{/each}
+			{/if}
+
+			{#if descriptionMode !== 'hidden'}
 			<div>
 				<div class="flex items-baseline justify-between">
-					<label for="description" class={labelClass}>Description</label>
+					<label for="description" class={labelClass}>
+						{template?.fields.length ? 'Anything else' : 'Description'}
+						{#if descriptionMode === 'optional'}<span class="font-normal text-ink-500">(optional)</span>{/if}
+					</label>
 					<span class={['text-xs tabular-nums', description.length > DESCRIPTION_MAX ? 'text-primary-300' : 'text-ink-500']}>{counter(description.length, DESCRIPTION_MAX)}</span>
 				</div>
 				<textarea
 					id="description"
 					bind:value={description}
 					maxlength={DESCRIPTION_MAX}
-					required
-					rows="10"
+					required={descriptionMode === 'required'}
+					rows={template?.fields.length ? 5 : 10}
 					onkeydown={onKeydown}
-					placeholder={'What happened, what did you expect, and any steps to reproduce it.\nInclude error messages if you have them.'}
-					class="field h-auto min-h-56 resize-y py-2.5 leading-relaxed"
+					placeholder={template?.fields.length
+							? 'Anything else the team should know.'
+							: 'What happened, what did you expect, and any steps to reproduce it.\nInclude error messages if you have them.'}
+					class={['field h-auto resize-y py-2.5 leading-relaxed', template?.fields.length ? 'min-h-28' : 'min-h-56']}
 				></textarea>
 			</div>
+			{/if}
 
 			{#if data.settings.allowImageUploads}
 				<ImageUploader bind:files={images} disabled={submitting} />
@@ -233,7 +354,7 @@
 								selected ? 'border-primary-400/50 bg-primary-400/10' : 'border-transparent hover:bg-ink-850'
 							]}
 						>
-							<input type="radio" name="priority" value={p.value} bind:group={priority} class="sr-only" />
+							<input type="radio" name="priority" value={p.value} bind:group={priority} onchange={() => (priorityTouched = true)} class="sr-only" />
 							<PriorityIcon priority={p.value} class={['size-4 shrink-0', selected ? 'text-ink-100' : 'text-ink-400'].join(' ')} />
 							<span class="min-w-0">
 								<span class={['block text-sm', selected ? 'font-medium text-ink-100' : 'text-ink-200']}>{p.label}</span>

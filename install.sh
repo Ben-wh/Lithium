@@ -243,7 +243,7 @@ BASE_URL=${BASE_URL%/}
 # ── Email ──────────────────────────────────────────────────────────────────
 section "Email notifications"
 SMTP_HOST="" SMTP_PORT="" SMTP_USERNAME="" SMTP_PASSWORD="" SMTP_FROM="" SMTP_TLS=""
-info "You can set email up here, or later in Lithium under Admin → Settings → Email."
+info "You can set email up here, or later in Lithium under Settings → Email."
 info "Setting it here fixes it in $ENV_FILE, and the Email page then shows it read-only."
 if ask_yn "Set up email now?" n; then
 	ask_required SMTP_HOST "SMTP host" "smtp.example.com"
@@ -286,7 +286,7 @@ if ask_yn "Set up email now?" n; then
 		err "That doesn't look like an email address."
 	done
 else
-	info "Skipped. An admin can set it up any time in Admin → Settings → Email."
+	info "Skipped. An admin can set it up any time in Settings → Email."
 fi
 
 # ── Summary ────────────────────────────────────────────────────────────────

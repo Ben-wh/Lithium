@@ -5,6 +5,7 @@
 	import CategoryTag from '$lib/components/CategoryTag.svelte';
 	import Modal from '$lib/components/Modal.svelte';
 	import { categoryColors, nextColor, type CategoryColor } from '$lib/categories';
+	import { loadTemplates, templateStore } from './templates.svelte';
 
 	const NAME_MAX = 60;
 	const DESCRIPTION_MAX = 200;
@@ -37,6 +38,8 @@
 	let name = $state('');
 	let description = $state('');
 	let color = $state<CategoryColor>('gray');
+	let templateId = $state<number | ''>('');
+	const templateName = (id: number | null) => templateStore.list.find((t) => t.id === id)?.name;
 	let formError = $state('');
 	let saving = $state(false);
 
@@ -44,6 +47,7 @@
 		editing = null;
 		name = description = formError = '';
 		color = nextColor(categories.filter((c) => !c.archived).map((c) => c.color));
+		templateId = '';
 		modalOpen = true;
 	}
 
@@ -52,6 +56,8 @@
 		name = c.name;
 		description = c.description;
 		color = c.color;
+		// A template deleted since the list loaded counts as none.
+		templateId = c.templateId !== null && templateName(c.templateId) ? c.templateId : '';
 		formError = '';
 		modalOpen = true;
 	}
@@ -66,14 +72,14 @@
 		formError = '';
 		try {
 			if (editing) {
-				await adminCategories.update(editing.id, { name, description, color });
+				await adminCategories.update(editing.id, { name, description, color, templateId: templateId === '' ? null : templateId });
 				notice = { kind: 'success', text: `Saved “${name.trim()}”.` };
 			} else {
-				await adminCategories.create({ name, description, color });
+				await adminCategories.create({ name, description, color, templateId: templateId === '' ? null : templateId });
 				notice = { kind: 'success', text: `Added “${name.trim()}”. Users can pick it when raising a ticket.` };
 			}
 			modalOpen = false;
-			await load();
+			await Promise.all([load(), loadTemplates()]); // template "used by" counts change too
 		} catch (err) {
 			formError = errorText(err);
 		} finally {
@@ -172,6 +178,11 @@
 						{#if c.description}
 							<p class="truncate text-xs text-ink-500">{c.description}</p>
 						{/if}
+						{#if c.templateId !== null && templateName(c.templateId)}
+							<p class="mt-0.5 flex items-center gap-1 truncate text-xs text-ink-400">
+								<Icon name="listUl" class="size-3" /> {templateName(c.templateId)}
+							</p>
+						{/if}
 					</div>
 					<span class="hidden shrink-0 text-xs text-ink-500 tabular-nums sm:block">
 						{c.ticketCount.toLocaleString()} {c.ticketCount === 1 ? 'ticket' : 'tickets'}
@@ -233,6 +244,20 @@
 				placeholder="Helps users pick the right one, e.g. “Laptops, monitors, phones”"
 				class="field h-auto resize-none py-2"
 			></textarea>
+		</div>
+		<div>
+			<label for="category-template" class={labelClass}>
+				Ticket template <span class="font-normal text-ink-500">(optional)</span>
+			</label>
+			<select id="category-template" bind:value={templateId} class="field">
+				<option value="">None (the usual form)</option>
+				{#each templateStore.list as t (t.id)}
+					<option value={t.id}>{t.name} · {t.fields.length} {t.fields.length === 1 ? 'field' : 'fields'}</option>
+				{/each}
+			</select>
+			{#if templateStore.loaded && templateStore.list.length === 0}
+				<p class="mt-1.5 text-xs text-ink-500">Create templates under Ticket templates above to ask for extra details.</p>
+			{/if}
 		</div>
 		<fieldset>
 			<legend class={labelClass}>Colour</legend>

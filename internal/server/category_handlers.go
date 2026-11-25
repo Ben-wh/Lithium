@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 	"strings"
@@ -41,16 +42,31 @@ func (s *Server) handleListCategories(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
-	// Ticket counts are an admin concern.
+	templates, err := s.store.ListTemplates(r.Context())
+	if err != nil {
+		s.log.Error("list templates", "err", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	byID := map[int64]*store.TicketTemplate{}
+	for i := range templates {
+		templates[i].CategoryCount = 0 // an admin concern
+		byID[templates[i].ID] = &templates[i]
+	}
+	// Ticket counts are an admin concern. The template shapes the new-ticket form.
 	type publicCategory struct {
-		ID          int64  `json:"id"`
-		Name        string `json:"name"`
-		Description string `json:"description"`
-		Color       string `json:"color"`
+		ID          int64                 `json:"id"`
+		Name        string                `json:"name"`
+		Description string                `json:"description"`
+		Color       string                `json:"color"`
+		Template    *store.TicketTemplate `json:"template"`
 	}
 	out := make([]publicCategory, len(cats))
 	for i, c := range cats {
-		out[i] = publicCategory{c.ID, c.Name, c.Description, c.Color}
+		out[i] = publicCategory{ID: c.ID, Name: c.Name, Description: c.Description, Color: c.Color}
+		if c.TemplateID != nil {
+			out[i].Template = byID[*c.TemplateID]
+		}
 	}
 	writeJSON(w, http.StatusOK, out)
 }
@@ -72,8 +88,12 @@ func (s *Server) handleCreateCategory(w http.ResponseWriter, r *http.Request) {
 		Name        string `json:"name"`
 		Description string `json:"description"`
 		Color       string `json:"color"`
+		TemplateID  int64  `json:"templateId"`
 	}
 	if !decodeJSON(w, r, &req) {
+		return
+	}
+	if !s.checkTemplateID(w, r, req.TemplateID) {
 		return
 	}
 	name, desc := strings.TrimSpace(req.Name), strings.TrimSpace(req.Description)
@@ -93,6 +113,14 @@ func (s *Server) handleCreateCategory(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
+	if req.TemplateID != 0 {
+		if err := s.store.SetCategoryTemplate(r.Context(), c.ID, req.TemplateID); err != nil {
+			s.log.Error("link template", "err", err)
+			writeError(w, http.StatusInternalServerError, "internal error")
+			return
+		}
+		c.TemplateID = &req.TemplateID
+	}
 	writeJSON(w, http.StatusCreated, c)
 }
 
@@ -107,6 +135,8 @@ func (s *Server) handleUpdateCategory(w http.ResponseWriter, r *http.Request) {
 		Description *string `json:"description"`
 		Color       *string `json:"color"`
 		Archived    *bool   `json:"archived"`
+		// TemplateID: absent leaves it; null or 0 unlinks; an id links.
+		TemplateID json.RawMessage `json:"templateId"`
 	}
 	if !decodeJSON(w, r, &req) {
 		return
@@ -136,6 +166,20 @@ func (s *Server) handleUpdateCategory(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, msg)
 		return
 	}
+	var templateID *int64
+	if len(req.TemplateID) > 0 {
+		var tid int64
+		if string(req.TemplateID) != "null" {
+			if err := json.Unmarshal(req.TemplateID, &tid); err != nil {
+				writeError(w, http.StatusBadRequest, "invalid template")
+				return
+			}
+		}
+		if !s.checkTemplateID(w, r, tid) {
+			return
+		}
+		templateID = &tid
+	}
 	c, err = s.store.UpdateCategory(r.Context(), id, c.Name, c.Description, c.Color, c.Archived)
 	if store.IsUniqueViolation(err) {
 		writeError(w, http.StatusConflict, "a category with that name already exists")
@@ -145,7 +189,34 @@ func (s *Server) handleUpdateCategory(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
+	if templateID != nil {
+		if err := s.store.SetCategoryTemplate(r.Context(), id, *templateID); err != nil {
+			s.log.Error("link template", "err", err)
+			writeError(w, http.StatusInternalServerError, "internal error")
+			return
+		}
+		if c, err = s.store.CategoryByID(r.Context(), id); err != nil {
+			writeError(w, http.StatusInternalServerError, "internal error")
+			return
+		}
+	}
 	writeJSON(w, http.StatusOK, c)
+}
+
+// checkTemplateID makes sure a template being linked exists (0 is "none").
+func (s *Server) checkTemplateID(w http.ResponseWriter, r *http.Request, id int64) bool {
+	if id == 0 {
+		return true
+	}
+	if _, err := s.store.TemplateByID(r.Context(), id); errors.Is(err, store.ErrNotFound) {
+		writeError(w, http.StatusBadRequest, "template not found")
+		return false
+	} else if err != nil {
+		s.log.Error("get template", "err", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return false
+	}
+	return true
 }
 
 func (s *Server) handleDeleteCategory(w http.ResponseWriter, r *http.Request) {

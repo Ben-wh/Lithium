@@ -22,7 +22,7 @@
 		type Ticket,
 		type TicketChanges
 	} from '$lib/api';
-	import { dateTimeFmt, formatBytes } from '$lib/format';
+	import { dateTimeFmt, formatBytes, formatDate } from '$lib/format';
 	import { priorities, priorityLabel, statusHints, statusLabels, ticketRef } from '$lib/tickets';
 
 	let { data } = $props();
@@ -191,7 +191,25 @@
 						<p class="text-xs text-ink-500">{dateTimeFmt.format(new Date(t.createdAt))}</p>
 					</div>
 				</header>
-				<div class="px-5 py-4 text-sm leading-relaxed whitespace-pre-wrap text-ink-200 break-words">{t.description}</div>
+				{#if t.fields?.length}
+					<div class="border-b border-ink-800 px-5 py-4">
+						<p class="mb-2.5 flex items-center gap-1.5 text-xs font-medium text-ink-400">
+							<Icon name="listUl" class="size-3.5" />
+							Details{#if t.templateName}<span class="font-normal text-ink-500">· {t.templateName}</span>{/if}
+						</p>
+						<dl class="grid gap-x-6 gap-y-2.5 text-sm sm:grid-cols-[minmax(8rem,max-content)_1fr]">
+							{#each t.fields as f, i (i)}
+								<dt class="text-ink-400">{f.label}</dt>
+								<dd class="min-w-0 break-words whitespace-pre-wrap text-ink-100">
+									{f.type === 'date' ? formatDate(f.value + 'T00:00:00') : f.value}
+								</dd>
+							{/each}
+						</dl>
+					</div>
+				{/if}
+				{#if t.description}
+					<div class="px-5 py-4 text-sm leading-relaxed whitespace-pre-wrap text-ink-200 break-words">{t.description}</div>
+				{/if}
 				{#if t.attachments.length > 0}
 					<div class="border-t border-ink-800 px-5 py-4">
 						<p class="mb-2.5 flex items-center gap-1.5 text-xs font-medium text-ink-400">

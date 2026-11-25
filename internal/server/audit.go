@@ -85,20 +85,23 @@ var auditRoutes = map[string]auditRoute{
 	"POST /api/admin/users/{id}/2fa/reset":         {action: "user.2fa_reset", category: catUsers, summary: "Reset a user's two-factor", target: "user"},
 	"POST /api/admin/password-resets/{id}/dismiss": {action: "user.reset_dismiss", category: catUsers, summary: "Dismissed a password reset request"},
 
-	"POST /api/admin/categories":        {action: "category.create", category: catSettings, summary: "Created a category", target: "category", create: true, fields: []string{"name"}},
-	"PATCH /api/admin/categories/{id}":  {action: "category.update", category: catSettings, summary: "Edited a category", target: "category", fields: []string{"*"}},
-	"DELETE /api/admin/categories/{id}": {action: "category.delete", category: catSettings, summary: "Deleted a category", target: "category"},
-	"PATCH /api/admin/settings":         {action: "settings.update", category: catSettings, summary: "Changed settings", fields: []string{"*"}},
-	"POST /api/admin/branding/logo":     {action: "settings.logo", category: catSettings, summary: "Uploaded a company logo"},
-	"DELETE /api/admin/branding/logo":   {action: "settings.logo_delete", category: catSettings, summary: "Removed the company logo"},
-	"PUT /api/admin/email":              {action: "settings.email", category: catSettings, summary: "Changed the email setup", fields: []string{"host", "port", "username", "from", "tls", "baseUrl"}},
-	"DELETE /api/admin/email":           {action: "settings.email_delete", category: catSettings, summary: "Turned off email"},
-	"POST /api/admin/email/test":        {action: "settings.email_test", category: catSettings, summary: "Sent a test email"},
-	"POST /api/admin/lockdown":          {action: "security.lockdown_start", category: catSettings, summary: "Started lockdown mode: everyone else signed out", failSummary: "Tried to start lockdown mode"},
-	"POST /api/admin/lockdown/end":      {action: "security.lockdown_end", category: catSettings, summary: "Ended lockdown mode"},
-	"POST /api/admin/groups":            {action: "group.create", category: catSettings, summary: "Created a group", target: "group", create: true, fields: []string{"name"}},
-	"PUT /api/admin/groups/{id}":        {action: "group.update", category: catSettings, summary: "Edited a group", target: "group"},
-	"DELETE /api/admin/groups/{id}":     {action: "group.delete", category: catSettings, summary: "Deleted a group", target: "group"},
+	"POST /api/admin/categories":              {action: "category.create", category: catSettings, summary: "Created a category", target: "category", create: true, fields: []string{"name"}},
+	"PATCH /api/admin/categories/{id}":        {action: "category.update", category: catSettings, summary: "Edited a category", target: "category", fields: []string{"*"}},
+	"DELETE /api/admin/categories/{id}":       {action: "category.delete", category: catSettings, summary: "Deleted a category", target: "category"},
+	"PATCH /api/admin/settings":               {action: "settings.update", category: catSettings, summary: "Changed settings", fields: []string{"*"}},
+	"POST /api/admin/branding/logo":           {action: "settings.logo", category: catSettings, summary: "Uploaded a company logo"},
+	"DELETE /api/admin/branding/logo":         {action: "settings.logo_delete", category: catSettings, summary: "Removed the company logo"},
+	"PUT /api/admin/email":                    {action: "settings.email", category: catSettings, summary: "Changed the email setup", fields: []string{"host", "port", "username", "from", "tls", "baseUrl"}},
+	"DELETE /api/admin/email":                 {action: "settings.email_delete", category: catSettings, summary: "Turned off email"},
+	"POST /api/admin/email/test":              {action: "settings.email_test", category: catSettings, summary: "Sent a test email"},
+	"POST /api/admin/lockdown":                {action: "security.lockdown_start", category: catSettings, summary: "Started lockdown mode: everyone else signed out", failSummary: "Tried to start lockdown mode"},
+	"POST /api/admin/lockdown/end":            {action: "security.lockdown_end", category: catSettings, summary: "Ended lockdown mode"},
+	"POST /api/admin/ticket-templates":        {action: "template.create", category: catSettings, summary: "Created a ticket template", target: "template", create: true},
+	"PUT /api/admin/ticket-templates/{id}":    {action: "template.update", category: catSettings, summary: "Edited a ticket template", target: "template"},
+	"DELETE /api/admin/ticket-templates/{id}": {action: "template.delete", category: catSettings, summary: "Deleted a ticket template", target: "template"},
+	"POST /api/admin/groups":                  {action: "group.create", category: catSettings, summary: "Created a group", target: "group", create: true, fields: []string{"name"}},
+	"PUT /api/admin/groups/{id}":              {action: "group.update", category: catSettings, summary: "Edited a group", target: "group"},
+	"DELETE /api/admin/groups/{id}":           {action: "group.delete", category: catSettings, summary: "Deleted a group", target: "group"},
 }
 
 // auditNote travels in the request context so the auth middleware and
@@ -344,6 +347,8 @@ func (s *Server) describeFields(ctx context.Context, fields map[string]string, s
 				v = s.auditTargetName(ctx, "category", id)
 			case "parentId":
 				v = s.auditTargetName(ctx, "ticket", id)
+			case "templateId":
+				v = s.auditTargetName(ctx, "template", id)
 			}
 		}
 		out = append(out, humanKey(k)+": "+v)
@@ -382,6 +387,10 @@ func (s *Server) auditTargetName(ctx context.Context, kind string, id int64) str
 	case "category":
 		if c, err := s.store.CategoryByID(ctx, id); err == nil {
 			return c.Name
+		}
+	case "template":
+		if t, err := s.store.TemplateByID(ctx, id); err == nil {
+			return t.Name
 		}
 	case "group":
 		if g, err := s.store.GroupByID(ctx, id); err == nil {

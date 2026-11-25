@@ -13,7 +13,7 @@ import (
 // Where the active email setup comes from.
 const (
 	emailFromEnv      = "environment" // LITHIUM_SMTP_* variables; can't be changed in the app
-	emailFromSettings = "settings"    // saved by an admin in Admin → Settings → Email
+	emailFromSettings = "settings"    // saved by an admin in Settings → Email
 )
 
 // mailSetup is the email setup in use right now.
@@ -110,7 +110,7 @@ func (s *Server) handleGetEmailSettings(w http.ResponseWriter, r *http.Request) 
 	writeJSON(w, http.StatusOK, out)
 }
 
-// handleSaveEmailSettings sets up email from Admin → Settings → Email. Not
+// handleSaveEmailSettings sets up email from Settings → Email. Not
 // allowed while the environment sets it, since that would silently be ignored.
 func (s *Server) handleSaveEmailSettings(w http.ResponseWriter, r *http.Request) {
 	if s.cfg.Mail.Enabled() {

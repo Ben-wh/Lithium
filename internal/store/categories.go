@@ -10,13 +10,15 @@ import (
 var ErrCategoryInUse = errors.New("category is used by tickets")
 
 type Category struct {
-	ID          int64     `json:"id"`
-	Name        string    `json:"name"`
-	Description string    `json:"description"`
-	Color       string    `json:"color"`
-	Archived    bool      `json:"archived"`
-	TicketCount int       `json:"ticketCount"`
-	CreatedAt   time.Time `json:"createdAt"`
+	ID          int64  `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Color       string `json:"color"`
+	Archived    bool   `json:"archived"`
+	TicketCount int    `json:"ticketCount"`
+	// TemplateID is the ticket template used for this category, or nil.
+	TemplateID *int64    `json:"templateId"`
+	CreatedAt  time.Time `json:"createdAt"`
 }
 
 // CategoryRef is a category as shown on a ticket.
@@ -27,14 +29,18 @@ type CategoryRef struct {
 }
 
 const categoryCols = `c.id, c.name, c.description, c.color, c.archived,
-	(SELECT COUNT(*) FROM tickets t WHERE t.category_id = c.id), c.created_at`
+	(SELECT COUNT(*) FROM tickets t WHERE t.category_id = c.id), c.template_id, c.created_at`
 
 func scanCategory(row scanner) (Category, error) {
 	var c Category
 	var created int64
-	err := row.Scan(&c.ID, &c.Name, &c.Description, &c.Color, &c.Archived, &c.TicketCount, &created)
+	var tpl sql.NullInt64
+	err := row.Scan(&c.ID, &c.Name, &c.Description, &c.Color, &c.Archived, &c.TicketCount, &tpl, &created)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Category{}, ErrNotFound
+	}
+	if tpl.Valid {
+		c.TemplateID = &tpl.Int64
 	}
 	c.CreatedAt = time.Unix(created, 0).UTC()
 	return c, err

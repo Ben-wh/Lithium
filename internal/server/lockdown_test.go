@@ -3,6 +3,7 @@ package server
 import (
 	"net/http"
 	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/lithium/lithium/internal/config"
@@ -104,5 +105,51 @@ func TestLockdown(t *testing.T) {
 	signIn(t, ts.URL, "other@example.com", "chosen-password")
 	if code := postJSON(t, admin, ts.URL+"/api/admin/lockdown/end", `{}`, nil); code != http.StatusConflict {
 		t.Fatalf("end twice: got %d", code)
+	}
+}
+
+func TestLockdownNeedsTwoFactorWhenOn(t *testing.T) {
+	ts := newTestServer(t)
+	admin := signIn(t, ts.URL, "admin@example.com", "correct-horse")
+	_, recovery := enrol(t, admin, ts.URL)
+	start := func(extra string) int {
+		return postJSON(t, admin, ts.URL+"/api/admin/lockdown", `{"confirm":"LOCKDOWN","password":"correct-horse"`+extra+`}`, nil)
+	}
+
+	if code := start(``); code != http.StatusBadRequest {
+		t.Fatalf("no code: got %d", code)
+	}
+	if code := start(`,"code":"000000"`); code != http.StatusBadRequest {
+		t.Fatalf("wrong code: got %d", code)
+	}
+	// A wrong password is caught before the code, so the code isn't spent.
+	if code := postJSON(t, admin, ts.URL+"/api/admin/lockdown", `{"confirm":"LOCKDOWN","password":"nope","code":"`+recovery[0]+`"}`, nil); code != http.StatusBadRequest {
+		t.Fatalf("wrong password: got %d", code)
+	}
+	if code := start(`,"code":"` + recovery[0] + `"`); code != 200 {
+		t.Fatalf("with recovery code: got %d", code)
+	}
+	// Already on: refused before any code is checked or used.
+	if code := start(`,"code":"` + recovery[1] + `"`); code != http.StatusConflict {
+		t.Fatalf("second start: got %d", code)
+	}
+	postJSON(t, admin, ts.URL+"/api/admin/lockdown/end", `{}`, nil)
+	// recovery[0] is used up; recovery[1] wasn't spent by the refused start.
+	if code := start(`,"code":"` + recovery[0] + `"`); code != http.StatusBadRequest {
+		t.Fatalf("reused recovery code: got %d", code)
+	}
+	if code := start(`,"code":"` + recovery[1] + `"`); code != 200 {
+		t.Fatalf("unspent recovery code: got %d", code)
+	}
+
+	var page activityPage
+	getJSON(t, admin, ts.URL+"/api/admin/activity?q=lockdown", &page)
+	var confirmed, wrong bool
+	for _, e := range page.Entries {
+		confirmed = confirmed || strings.Contains(e.Detail, "two-factor confirmed")
+		wrong = wrong || strings.Contains(e.Detail, "wrong two-factor code")
+	}
+	if !confirmed || !wrong {
+		t.Fatalf("activity: %+v", page.Entries)
 	}
 }

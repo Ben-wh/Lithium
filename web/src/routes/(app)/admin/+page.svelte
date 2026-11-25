@@ -9,7 +9,6 @@
 		type ResetRequest,
 		type Role
 	} from '$lib/api';
-	import LithiumSettings from '$lib/components/admin/LithiumSettings.svelte';
 	import GroupManager from '$lib/components/admin/GroupManager.svelte';
 	import DeleteUserDialog from '$lib/components/admin/DeleteUserDialog.svelte';
 	import Dropdown from '$lib/components/Dropdown.svelte';
@@ -20,7 +19,7 @@
 
 	let { data } = $props();
 
-	const tabs = ['users', 'resets', 'groups', 'settings'] as const;
+	const tabs = ['users', 'resets', 'groups'] as const;
 	type Tab = (typeof tabs)[number];
 	const tab = $derived<Tab>(tabs.find((t) => t === page.url.searchParams.get('tab')) ?? 'users');
 
@@ -297,7 +296,7 @@
 	<div class="flex flex-wrap items-end justify-between gap-4">
 		<div>
 			<h1 class="text-2xl font-semibold tracking-tight">Admin</h1>
-			<p class="mt-1 text-sm text-ink-400">Manage who can access your workspace and how Lithium runs.</p>
+			<p class="mt-1 text-sm text-ink-400">Manage who can access your workspace. Workspace settings are under Settings.</p>
 		</div>
 		{#if tab === 'users' || tab === 'resets'}
 			<button type="button" onclick={openCreate} class={primaryBtn}>
@@ -339,9 +338,6 @@
 		</a>
 		<a href="?tab=groups" data-sveltekit-replacestate data-sveltekit-noscroll class={tabClass(tab === 'groups')}>
 			<Icon name="users" class="size-4" /> Groups
-		</a>
-		<a href="?tab=settings" data-sveltekit-replacestate data-sveltekit-noscroll class={tabClass(tab === 'settings')}>
-			<Icon name="settings" class="size-4" /> Lithium settings
 		</a>
 	</div>
 
@@ -551,10 +547,8 @@
 				</ul>
 			{/if}
 		</div>
-	{:else if tab === 'groups'}
-		<GroupManager />
 	{:else}
-		<LithiumSettings />
+		<GroupManager />
 	{/if}
 </div>
 

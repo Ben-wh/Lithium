@@ -69,7 +69,7 @@
 				</p>
 			</div>
 			<p class="mt-2 px-1 text-xs text-ink-500">
-				Skipping turns off mandatory two-factor for everyone. You can turn it back on in Admin → Settings. This
+				Skipping turns off mandatory two-factor for everyone. You can turn it back on in Settings → Users. This
 				option is only offered once.
 			</p>
 			{#if skipError}

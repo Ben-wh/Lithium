@@ -39,6 +39,9 @@ func (s *Server) handleStartLockdown(w http.ResponseWriter, r *http.Request) {
 		Confirm  string `json:"confirm"`
 		Password string `json:"password"`
 		Reason   string `json:"reason"`
+		// Code is an authenticator or recovery code, needed when the admin
+		// has two-factor on.
+		Code string `json:"code"`
 	}
 	if !decodeJSON(w, r, &req) {
 		return
@@ -58,6 +61,39 @@ func (s *Server) handleStartLockdown(w http.ResponseWriter, r *http.Request) {
 	}
 	if reason != "" {
 		auditDetail(r.Context(), "reason: %s", reason)
+	}
+	if cur, err := s.store.Lockdown(r.Context()); err != nil {
+		s.log.Error("read lockdown state", "err", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	} else if cur.Active {
+		writeError(w, http.StatusConflict, "lockdown is already on")
+		return
+	}
+	// Two-factor last, once everything else is fine, so a good code isn't
+	// used up by an unrelated mistake.
+	if user.TwoFactorEnabled {
+		if strings.TrimSpace(req.Code) == "" {
+			writeError(w, http.StatusBadRequest, "enter the code from your authenticator app")
+			return
+		}
+		if !s.mfaLimiter.allow(s.clientIP(r)) {
+			w.Header().Set("Retry-After", "60")
+			writeError(w, http.StatusTooManyRequests, "too many attempts, try again shortly")
+			return
+		}
+		ok, err := s.checkSecondFactor(r.Context(), user, req.Code)
+		if err != nil {
+			s.log.Error("check two-factor code", "err", err)
+			writeError(w, http.StatusInternalServerError, "internal error")
+			return
+		}
+		if !ok {
+			auditDetail(r.Context(), "wrong two-factor code")
+			writeError(w, http.StatusBadRequest, "that two-factor code isn't right")
+			return
+		}
+		auditDetail(r.Context(), "two-factor confirmed")
 	}
 
 	ended, err := s.store.StartLockdown(r.Context(), user, reason, sessionFrom(r.Context()))

@@ -106,7 +106,7 @@
 					</p>
 				</div>
 				<a
-					href="?tab=settings&section=email"
+					href="/settings?section=email"
 					data-sveltekit-replacestate
 					data-sveltekit-noscroll
 					class="shrink-0 text-[13px] text-primary-300 hover:text-primary-200"
@@ -147,7 +147,7 @@
 				Agent groups
 				{#snippet description()}
 					Agents only see tickets in their groups' categories, plus uncategorised tickets and ones assigned to them.
-					Admins always see everything. Set up groups in <a href="?tab=groups" class="text-primary-300 hover:text-primary-200">Admin → Groups</a>.
+					Admins always see everything. Set up groups in <a href="/admin?tab=groups" class="text-primary-300 hover:text-primary-200">Admin → Groups</a>.
 				{/snippet}
 			</Toggle>
 		{/if}

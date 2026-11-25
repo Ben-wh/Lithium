@@ -6,6 +6,7 @@
 	import Toggle from '$lib/components/Toggle.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import CategoryManager from './CategoryManager.svelte';
+	import TemplateManager from './TemplateManager.svelte';
 
 	let settings = $state<Settings | null>(null);
 	let loadFailed = $state(false);
@@ -250,4 +251,5 @@
 	</div>
 </div>
 
+<TemplateManager />
 <CategoryManager />

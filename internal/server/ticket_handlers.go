@@ -36,6 +36,8 @@ type createTicketRequest struct {
 	Priority    string `json:"priority"`
 	CategoryID  int64  `json:"categoryId"`
 	RequesterID int64  `json:"requesterId"`
+	// Fields are answers to the category's template, by field id.
+	Fields map[string]json.RawMessage `json:"fields"`
 }
 
 func (s *Server) handleCreateTicket(w http.ResponseWriter, r *http.Request) {
@@ -84,9 +86,6 @@ func (s *Server) handleCreateTicket(w http.ResponseWriter, r *http.Request) {
 	case utf8.RuneCountInString(req.Subject) > settings.SubjectMaxLength:
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("subject must be %d characters or fewer", settings.SubjectMaxLength))
 		return
-	case req.Description == "":
-		writeError(w, http.StatusBadRequest, "description is required")
-		return
 	case utf8.RuneCountInString(req.Description) > settings.DescriptionMaxLength:
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("description must be %s characters or fewer", thousands(settings.DescriptionMaxLength)))
 		return
@@ -133,7 +132,11 @@ func (s *Server) handleCreateTicket(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Only active categories can be chosen for new tickets.
+	// Only active categories can be chosen for new tickets. A category's
+	// template decides the extra fields and whether a description is needed.
+	descriptionMode := store.DescriptionRequired
+	var fields []store.TicketField
+	var templateName string
 	if req.CategoryID != 0 {
 		c, err := s.store.CategoryByID(r.Context(), req.CategoryID)
 		if errors.Is(err, store.ErrNotFound) || (err == nil && c.Archived) {
@@ -144,6 +147,29 @@ func (s *Server) handleCreateTicket(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusInternalServerError, "internal error")
 			return
 		}
+		if c.TemplateID != nil {
+			tpl, err := s.store.TemplateByID(r.Context(), *c.TemplateID)
+			if err != nil {
+				s.log.Error("lookup template", "err", err)
+				writeError(w, http.StatusInternalServerError, "internal error")
+				return
+			}
+			var msg string
+			if fields, msg = answerTemplate(tpl, req.Fields); msg != "" {
+				writeError(w, http.StatusBadRequest, msg)
+				return
+			}
+			descriptionMode, templateName = tpl.DescriptionMode, tpl.Name
+		}
+	}
+	switch descriptionMode {
+	case store.DescriptionRequired:
+		if req.Description == "" {
+			writeError(w, http.StatusBadRequest, "description is required")
+			return
+		}
+	case store.DescriptionHidden:
+		req.Description = ""
 	}
 
 	attachments, cleanup, err := s.saveImages(files)
@@ -158,13 +184,15 @@ func (s *Server) handleCreateTicket(w http.ResponseWriter, r *http.Request) {
 	}
 
 	t, err := s.store.CreateTicket(r.Context(), store.NewTicket{
-		Subject:     req.Subject,
-		Description: req.Description,
-		Priority:    req.Priority,
-		CategoryID:  req.CategoryID,
-		RequesterID: requesterID,
-		CreatedBy:   user.ID,
-		Attachments: attachments,
+		Subject:      req.Subject,
+		Description:  req.Description,
+		Priority:     req.Priority,
+		CategoryID:   req.CategoryID,
+		RequesterID:  requesterID,
+		CreatedBy:    user.ID,
+		Attachments:  attachments,
+		Fields:       fields,
+		TemplateName: templateName,
 	})
 	if err != nil {
 		cleanup()

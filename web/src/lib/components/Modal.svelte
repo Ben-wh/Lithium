@@ -6,8 +6,19 @@
 		open = $bindable(false),
 		title,
 		description,
+		size = 'md',
+		closeOnBackdrop = true,
 		children
-	}: { open?: boolean; title: string; description?: string; children: Snippet } = $props();
+	}: {
+		open?: boolean;
+		title: string;
+		description?: string;
+		/** "lg" for forms that need room, like the template editor. */
+		size?: 'md' | 'lg';
+		/** Turn off for forms where a stray click outside would lose work. */
+		closeOnBackdrop?: boolean;
+		children: Snippet;
+	} = $props();
 
 	let dialog: HTMLDialogElement | undefined = $state();
 
@@ -22,8 +33,10 @@
 <dialog
 	bind:this={dialog}
 	onclose={() => (open = false)}
-	onclick={(e) => e.target === dialog && (open = false)}
-	class="m-auto w-[calc(100%-2rem)] max-w-md rounded-2xl border border-ink-800 bg-ink-900 text-ink-100 shadow-2xl shadow-shade/60 backdrop:bg-black/60 backdrop:backdrop-blur-sm"
+	onclick={(e) => closeOnBackdrop && e.target === dialog && (open = false)}
+	class:max-w-md={size === 'md'}
+	class:max-w-2xl={size === 'lg'}
+	class="m-auto w-[calc(100%-2rem)] rounded-2xl border border-ink-800 bg-ink-900 text-ink-100 shadow-2xl shadow-shade/60 backdrop:bg-black/60 backdrop:backdrop-blur-sm"
 >
 	{#if open}
 		<div class="p-6">
