@@ -79,7 +79,7 @@ ask_yn() {
 	while true; do
 		read -r -p "  $prompt ${DIM}[$hint]${RESET}: " reply </dev/tty
 		reply=${reply:-$default}
-		case "${reply,,}" in
+		case "$(lower "$reply")" in
 			y|yes) return 0 ;;
 			n|no)  return 1 ;;
 			*) err "Please answer y or n." ;;
@@ -101,6 +101,9 @@ ask_secret() {
 		return
 	done
 }
+
+# lower TEXT → TEXT in lower case. (Not ${x,,}: macOS ships bash 3.2.)
+lower() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]'; }
 
 valid_email() { [[ "$1" =~ ^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$ ]]; }
 
@@ -155,7 +158,7 @@ if ! command -v docker >/dev/null || ! docker compose version >/dev/null 2>&1; t
 	warn "Docker with the compose plugin wasn't found. You can still write .env now and start Lithium later."
 elif docker_err=$(docker info 2>&1); then
 	HAVE_DOCKER=1
-elif [[ "${docker_err,,}" == *"permission denied"* ]]; then
+elif [[ "$(lower "$docker_err")" == *"permission denied"* ]]; then
 	warn "Your user can't talk to Docker (not in the 'docker' group)."
 	info "To fix it for good:  sudo usermod -aG docker \$USER  then log out and back in."
 	if command -v sudo >/dev/null && ask_yn "Use sudo for Docker this time instead?" y; then
