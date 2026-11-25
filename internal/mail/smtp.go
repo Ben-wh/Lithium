@@ -61,7 +61,7 @@ func (s *SMTP) Send(ctx context.Context, m Message) error {
 	if s.cfg.TLS == "starttls" {
 		// Required, not opportunistic: never send credentials or mail in the clear by accident.
 		if ok, _ := c.Extension("STARTTLS"); !ok {
-			return errors.New("the mail server doesn't support STARTTLS; set LITHIUM_SMTP_TLS if that's expected")
+			return errors.New("the mail server doesn't support STARTTLS; choose a different encryption setting if that's expected")
 		}
 		if err := c.StartTLS(tlsConfig); err != nil {
 			return fmt.Errorf("starttls: %w", err)

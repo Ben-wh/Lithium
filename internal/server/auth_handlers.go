@@ -81,9 +81,25 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		s.log.Error("verify password", "err", err, "user_id", user.ID)
 	}
+	// In lockdown only the admin who started it gets in. Everyone else gets
+	// the same answer whether or not their password was right.
+	if l, err := s.store.Lockdown(r.Context()); err != nil {
+		s.log.Error("read lockdown state", "err", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	} else if l.Active && (!ok || user.ID == 0 || user.ID != l.ByID) {
+		s.log.Warn("sign-in refused: lockdown", "email", req.Email, "ip", ip)
+		writeError(w, http.StatusLocked, lockdownBlockedMsg)
+		return
+	}
 	if !ok || user.ID == 0 {
 		writeError(w, http.StatusUnauthorized, "incorrect email or password")
 		return
+	}
+
+	auditActor(r.Context(), user)
+	if user.TwoFactorEnabled {
+		auditDetail(r.Context(), "password accepted, waiting for two-factor code")
 	}
 
 	// With two-factor on, the session only lets the user enter a code until
@@ -116,7 +132,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		user.TwoFactor = "verify"
 		s.log.Info("login password accepted, awaiting two-factor code", "user_id", user.ID, "ip", ip)
 	} else {
-		if user.TwoFactor, err = s.twoFactorSetupState(r.Context(), user); err != nil {
+		if err := s.applyTwoFactorSetupState(r.Context(), &user); err != nil {
 			writeError(w, http.StatusInternalServerError, "internal error")
 			return
 		}
@@ -166,8 +182,27 @@ func (s *Server) twoFactorSetupState(ctx context.Context, u store.User) (string,
 	return "", nil
 }
 
+// applyTwoFactorSetupState sets u.TwoFactor for a session past the code step,
+// and whether this user may skip the setup (the first admin, once).
+func (s *Server) applyTwoFactorSetupState(ctx context.Context, u *store.User) error {
+	var err error
+	if u.TwoFactor, err = s.twoFactorSetupState(ctx, *u); err != nil {
+		return err
+	}
+	if u.TwoFactor == "setup" && u.Role == "admin" {
+		if u.CanSkipTwoFactor, err = s.store.CanSkipTwoFactor(ctx, u.ID); err != nil {
+			s.log.Error("check two-factor skip", "err", err)
+			return err
+		}
+	}
+	return nil
+}
+
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 	if c, err := r.Cookie(sessionCookie); err == nil {
+		if sess, err := s.store.SessionByToken(r.Context(), auth.HashToken(c.Value)); err == nil {
+			auditActor(r.Context(), sess.User)
+		}
 		if err := s.store.DeleteSession(r.Context(), auth.HashToken(c.Value)); err != nil {
 			s.log.Error("delete session", "err", err)
 		}
@@ -232,13 +267,28 @@ func (s *Server) authenticate(next http.Handler, level authLevel) http.Handler {
 			return
 		}
 		user := sess.User
+		auditActor(r.Context(), user)
+		// Lockdown deletes other sessions when it starts; this also catches
+		// any that slip through, and signs them out.
+		if l, err := s.store.Lockdown(r.Context()); err != nil {
+			s.log.Error("read lockdown state", "err", err)
+			writeError(w, http.StatusInternalServerError, "internal error")
+			return
+		} else if l.Active && l.ByID != user.ID {
+			if err := s.store.DeleteSession(r.Context(), tokenHash); err != nil {
+				s.log.Error("delete session", "err", err)
+			}
+			s.clearSessionCookie(w)
+			writeError(w, http.StatusUnauthorized, "not signed in")
+			return
+		}
 		if sess.MFAPending {
 			user.TwoFactor = "verify"
 			if level > levelPending {
 				writeError(w, http.StatusForbidden, "two-factor code required")
 				return
 			}
-		} else if user.TwoFactor, err = s.twoFactorSetupState(r.Context(), user); err != nil {
+		} else if err := s.applyTwoFactorSetupState(r.Context(), &user); err != nil {
 			writeError(w, http.StatusInternalServerError, "internal error")
 			return
 		}

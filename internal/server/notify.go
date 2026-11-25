@@ -104,7 +104,7 @@ func (s *Server) notify(ctx context.Context, rs *recipients, t store.Ticket, kin
 // set up and an admin hasn't turned them off. People can still opt out
 // individually (checked when queueing).
 func (s *Server) emailOn(ctx context.Context) bool {
-	if !s.cfg.Mail.Enabled() {
+	if m, err := s.mailSetup(ctx); err != nil || !m.on() {
 		return false
 	}
 	st, err := s.store.Settings(ctx)
@@ -139,8 +139,9 @@ func (s *Server) notificationEmail(ctx context.Context, actorID int64, t store.T
 		e.Subject = "[" + ref + "] " + t.Subject
 		fmt.Fprintf(&b, "%s: %s\n", ref, t.Subject)
 	}
-	if s.cfg.BaseURL != "" {
-		fmt.Fprintf(&b, "\nView the ticket: %s/tickets/%d\n", s.cfg.BaseURL, t.ID)
+	setup, _ := s.mailSetup(ctx)
+	if setup.BaseURL != "" {
+		fmt.Fprintf(&b, "\nView the ticket: %s/tickets/%d\n", setup.BaseURL, t.ID)
 	} else {
 		fmt.Fprintf(&b, "\nSign in to %s to view it.\n", brand)
 	}

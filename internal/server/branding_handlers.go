@@ -97,7 +97,7 @@ func (s *Server) writeSettings(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
-	writeJSON(w, http.StatusOK, s.withServerSettings(st))
+	writeJSON(w, http.StatusOK, s.withServerSettings(r.Context(), st))
 }
 
 // handleGetLogo serves the company logo to anyone, signed in or not, since

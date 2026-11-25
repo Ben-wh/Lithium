@@ -21,7 +21,7 @@ type Server struct {
 	resetLimiter *ipLimiter  // password reset requests
 	mfaLimiter   *ipLimiter  // two-factor codes
 	dummyHash    string      // compared against when a login email doesn't exist, to keep timing uniform
-	mailer       mail.Sender // nil when email isn't set up; used for test emails
+	mailer       mail.Sender // tests only: replaces the SMTP sender (see senderFor)
 }
 
 func New(cfg config.Config, st *store.Store, log *slog.Logger) (*Server, error) {
@@ -37,15 +37,7 @@ func New(cfg config.Config, st *store.Store, log *slog.Logger) (*Server, error) 
 		resetLimiter: newIPLimiter(),
 		mfaLimiter:   newIPLimiter(),
 		dummyHash:    dummy,
-		mailer:       newMailer(cfg),
 	}, nil
-}
-
-func newMailer(cfg config.Config) mail.Sender {
-	if !cfg.Mail.Enabled() {
-		return nil
-	}
-	return mail.NewSMTP(cfg.Mail)
 }
 
 // Handler returns the root HTTP handler. frontend is the built SPA; it may be
@@ -65,6 +57,7 @@ func (s *Server) Handler(frontend fs.FS) http.Handler {
 	mux.Handle("GET /api/auth/2fa", s.requireSession(http.HandlerFunc(s.handleTwoFactorStatus)))
 	mux.Handle("POST /api/auth/2fa/setup", s.requireSession(http.HandlerFunc(s.handleStartTwoFactor)))
 	mux.Handle("POST /api/auth/2fa/enable", s.requireSession(http.HandlerFunc(s.handleEnableTwoFactor)))
+	mux.Handle("POST /api/auth/2fa/skip", s.requireSession(http.HandlerFunc(s.handleSkipTwoFactor)))
 	mux.Handle("POST /api/auth/2fa/recovery-codes", s.requireUser(http.HandlerFunc(s.handleNewRecoveryCodes)))
 	mux.Handle("POST /api/auth/2fa/disable", s.requireUser(http.HandlerFunc(s.handleDisableTwoFactor)))
 	mux.HandleFunc("POST /api/auth/password-reset-request", s.handleRequestPasswordReset)
@@ -134,6 +127,13 @@ func (s *Server) Handler(frontend fs.FS) http.Handler {
 	admin("POST /api/admin/branding/logo", s.handleUploadLogo)
 	admin("DELETE /api/admin/branding/logo", s.handleDeleteLogo)
 	admin("POST /api/admin/email/test", s.handleSendTestEmail)
+	admin("GET /api/admin/email", s.handleGetEmailSettings)
+	admin("PUT /api/admin/email", s.handleSaveEmailSettings)
+	admin("DELETE /api/admin/email", s.handleDeleteEmailSettings)
+	admin("GET /api/admin/activity", s.handleActivity)
+	admin("GET /api/admin/lockdown", s.handleGetLockdown)
+	admin("POST /api/admin/lockdown", s.handleStartLockdown)
+	admin("POST /api/admin/lockdown/end", s.handleEndLockdown)
 	admin("GET /api/admin/groups", s.handleListGroups)
 	admin("POST /api/admin/groups", s.handleCreateGroup)
 	admin("PUT /api/admin/groups/{id}", s.handleUpdateGroup)
@@ -144,7 +144,7 @@ func (s *Server) Handler(frontend fs.FS) http.Handler {
 	})
 	mux.Handle("/", spaHandler(frontend))
 
-	return s.logRequests(securityHeaders(requireJSONForWrites(mux)))
+	return s.logRequests(securityHeaders(requireJSONForWrites(s.auditRequests(mux))))
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {

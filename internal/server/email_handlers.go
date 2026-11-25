@@ -22,17 +22,23 @@ func (s *Server) fromName(ctx context.Context) string {
 // away (not through the outbox), so a mistake in the SMTP settings shows up
 // on screen rather than in the logs.
 func (s *Server) handleSendTestEmail(w http.ResponseWriter, r *http.Request) {
-	if s.mailer == nil {
-		writeError(w, http.StatusConflict, "email isn't set up on this server")
+	setup, err := s.mailSetup(r.Context())
+	if err != nil {
+		s.log.Error("load email setup", "err", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	if !setup.on() {
+		writeError(w, http.StatusConflict, "email isn't set up yet")
 		return
 	}
 	user := userFrom(r.Context())
 	brand := s.fromName(r.Context())
 	ctx, cancel := context.WithTimeout(r.Context(), 45*time.Second)
 	defer cancel()
-	err := s.mailer.Send(ctx, mail.Message{
+	err = s.senderFor(setup.Mail).Send(ctx, mail.Message{
 		FromName: brand,
-		From:     s.cfg.Mail.From,
+		From:     setup.Mail.From,
 		To:       user.Email,
 		Subject:  "Test email from " + brand,
 		Body: fmt.Sprintf("This is a test email from %s, sent by %s.\n\n"+

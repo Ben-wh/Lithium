@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { logout } from '$lib/api';
+	import { ApiError, logout, twoFactor } from '$lib/api';
 	import BrandLogo from '$lib/components/BrandLogo.svelte';
 	import ThemeSwitcher from '$lib/components/ThemeSwitcher.svelte';
 	import TwoFactorEnrol from '$lib/components/TwoFactorEnrol.svelte';
@@ -10,6 +10,21 @@
 	async function signOut() {
 		await logout();
 		await goto('/login', { invalidateAll: true });
+	}
+
+	let skipping = $state(false);
+	let skipError = $state('');
+
+	async function skip() {
+		skipping = true;
+		skipError = '';
+		try {
+			await twoFactor.skip();
+			await goto('/', { invalidateAll: true, replaceState: true });
+		} catch (e) {
+			skipError = e instanceof ApiError ? e.message : 'Something went wrong, please try again.';
+			skipping = false;
+		}
 	}
 </script>
 
@@ -38,6 +53,29 @@
 				<TwoFactorEnrol email={data.user.email} ondone={() => goto('/', { invalidateAll: true, replaceState: true })} />
 			{/if}
 		</div>
+
+		{#if data.user?.canSkipTwoFactor}
+			<div class="mt-4 flex items-center gap-4 rounded-2xl border border-danger-400/25 bg-danger-400/10 p-4">
+				<button
+					type="button"
+					onclick={skip}
+					disabled={skipping}
+					class="shrink-0 rounded-lg border border-danger-400/50 px-3 py-2 text-sm font-medium text-danger-200 transition hover:bg-danger-400/10 disabled:opacity-60"
+				>
+					{skipping ? 'Skipping…' : 'Skip for now'}
+				</button>
+				<p class="text-xs leading-relaxed font-semibold text-danger-300">
+					FOR TESTING ONLY - IN PRODUCTION ENVIRONMENT, IT IS HIGHLY RECOMMENDED TO SET UP 2FA
+				</p>
+			</div>
+			<p class="mt-2 px-1 text-xs text-ink-500">
+				Skipping turns off mandatory two-factor for everyone. You can turn it back on in Admin → Settings. This
+				option is only offered once.
+			</p>
+			{#if skipError}
+				<p class="mt-2 px-1 text-sm text-danger-300" role="alert">{skipError}</p>
+			{/if}
+		{/if}
 
 		<p class="mt-8 text-center text-sm">
 			<button type="button" onclick={signOut} class="text-ink-400 transition hover:text-primary-300">Sign out</button>

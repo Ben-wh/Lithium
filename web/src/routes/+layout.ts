@@ -14,7 +14,7 @@ export const load: LayoutLoad = async ({ fetch, url, depends }) => {
 	const [meResult, banner, branding] = await Promise.all([
 		me(fetch).catch((e) => e),
 		// The sensitive mode banner and company branding show on the sign-in pages too.
-		publicBanner(fetch).catch(() => ({ sensitiveMode: false, sensitiveMessage: '' })),
+		publicBanner(fetch).catch(() => ({ sensitiveMode: false, sensitiveMessage: '', lockdown: false })),
 		publicBranding(fetch).catch(() => ({ companyName: '', logoUrl: '', accent: 'coral' as const }))
 	]);
 	if (meResult instanceof Error) {

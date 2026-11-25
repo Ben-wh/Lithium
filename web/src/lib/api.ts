@@ -21,6 +21,8 @@ export type User = {
 	 * password), "setup" (2FA is mandatory but not set up yet), or "".
 	 */
 	twoFactor: '' | 'verify' | 'setup';
+	/** The admin created at first startup may skip 2FA setup, once. */
+	canSkipTwoFactor?: boolean;
 };
 
 export class ApiError extends Error {
@@ -78,6 +80,8 @@ export const twoFactor = {
 	start: () => request<TwoFactorSetup>('/api/auth/2fa/setup', { method: 'POST', body: '{}' }),
 	enable: (code: string) =>
 		request<{ recoveryCodes: string[] }>('/api/auth/2fa/enable', { method: 'POST', body: JSON.stringify({ code }) }),
+	/** First admin only, once: skip setup and turn mandatory 2FA off. */
+	skip: () => request<User>('/api/auth/2fa/skip', { method: 'POST', body: '{}' }),
 	newRecoveryCodes: (password: string) =>
 		request<{ recoveryCodes: string[] }>('/api/auth/2fa/recovery-codes', {
 			method: 'POST',
@@ -93,7 +97,7 @@ export const publicBranding = (f?: Fetch) => request<Branding>('/api/public/bran
 
 /** The sensitive mode banner; readable before signing in. */
 export const publicBanner = (f?: Fetch) =>
-	request<{ sensitiveMode: boolean; sensitiveMessage: string }>('/api/public/banner', {}, f);
+	request<{ sensitiveMode: boolean; sensitiveMessage: string; lockdown: boolean }>('/api/public/banner', {}, f);
 
 export const logout = () => request<void>('/api/auth/logout', { method: 'POST', body: '{}' });
 
@@ -364,7 +368,7 @@ export type Settings = {
 	logoUrl: string;
 	/** Email people about their tickets as well as notifying them in the app. */
 	emailNotifications: boolean;
-	/** Read-only: whether the server has SMTP set up (LITHIUM_SMTP_HOST). */
+	/** Read-only: whether email is set up (by LITHIUM_SMTP_* or in Admin → Settings → Email). */
 	emailConfigured: boolean;
 };
 
@@ -384,6 +388,37 @@ export const adminSettings = {
 /** Admin only: email the signed-in admin now, to check the SMTP settings. */
 export const sendTestEmail = () =>
 	request<{ sentTo: string }>('/api/admin/email/test', { method: 'POST', body: '{}' });
+
+export type EmailEncryption = 'starttls' | 'tls' | 'none';
+
+/** The outgoing email (SMTP) setup, as admins see it. The password is never sent back. */
+export type EmailSettings = {
+	/** "environment": set by LITHIUM_SMTP_* (read-only here); "settings": saved by an admin; "": email is off. */
+	source: '' | 'environment' | 'settings';
+	host: string;
+	port: number;
+	username: string;
+	hasPassword: boolean;
+	from: string;
+	tls: EmailEncryption;
+	/** Where people reach Lithium, for links in emails. */
+	baseUrl: string;
+	/** baseUrl comes from LITHIUM_BASE_URL and can't be changed here. */
+	baseUrlFromEnv: boolean;
+};
+
+export type EmailSettingsUpdate = Omit<EmailSettings, 'source' | 'hasPassword' | 'baseUrlFromEnv'> & {
+	/** Leave out to keep the saved password. */
+	password?: string;
+};
+
+export const emailSettings = {
+	get: () => request<EmailSettings>('/api/admin/email'),
+	save: (s: EmailSettingsUpdate) =>
+		request<EmailSettings>('/api/admin/email', { method: 'PUT', body: JSON.stringify(s) }),
+	/** Turns email off. */
+	remove: () => request<EmailSettings>('/api/admin/email', { method: 'DELETE' })
+};
 
 export const COMPANY_NAME_MAX = 60;
 export const MAX_LOGO_BYTES = 2 * 1024 * 1024;
@@ -571,4 +606,66 @@ export const reports = {
 		if (o.description) p.set('description', '1');
 		return `/api/reports/export?${p}`;
 	}
+};
+
+// --- Activity log (admins) ---
+
+export type ActivityCategory = 'auth' | 'tickets' | 'users' | 'settings' | 'knowledge' | 'profile' | 'reports' | 'system';
+
+export type ActivityEntry = {
+	id: number;
+	at: string;
+	/** null for sign-in attempts on unknown accounts and system events. */
+	actorId: number | null;
+	actorName: string;
+	actorEmail: string;
+	/** Stable code, e.g. "ticket.update". */
+	action: string;
+	category: ActivityCategory;
+	/** e.g. "Updated a ticket". */
+	summary: string;
+	/** What it was done to, e.g. "TID-42". */
+	target: string;
+	/** e.g. "status: closed · assignee: Sam". */
+	detail: string;
+	outcome: 'success' | 'failure';
+	ip: string;
+	userAgent: string;
+};
+
+export type ActivityQuery = {
+	q?: string;
+	category?: ActivityCategory | '';
+	outcome?: 'success' | 'failure' | '';
+	/** Unix seconds. */
+	since?: number;
+	until?: number;
+	/** Only entries older than this id (for "Load more"). */
+	before?: number;
+};
+
+export const activity = {
+	list: (query: ActivityQuery = {}, f?: Fetch) => {
+		const params = new URLSearchParams();
+		for (const [k, v] of Object.entries(query)) if (v !== undefined && v !== '' && v !== 0) params.set(k, String(v));
+		return request<{ entries: ActivityEntry[]; hasMore: boolean }>(`/api/admin/activity?${params}`, {}, f);
+	}
+};
+
+// --- Lockdown mode (admins) ---
+
+export type Lockdown = { active: boolean; byId: number; byName: string; at: string; reason: string };
+
+/** Typed exactly to confirm starting a lockdown (the server checks it too). */
+export const LOCKDOWN_PHRASE = 'LOCKDOWN';
+
+export const lockdown = {
+	get: () => request<Lockdown>('/api/admin/lockdown'),
+	/** Signs everyone else out and blocks sign-in for anyone but you. */
+	start: (password: string, reason: string) =>
+		request<Lockdown>('/api/admin/lockdown', {
+			method: 'POST',
+			body: JSON.stringify({ confirm: LOCKDOWN_PHRASE, password, reason })
+		}),
+	end: () => request<Lockdown>('/api/admin/lockdown/end', { method: 'POST', body: '{}' })
 };

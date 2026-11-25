@@ -186,7 +186,8 @@ func TestPublicBanner(t *testing.T) {
 	}
 	do(t, admin, "PATCH", ts.URL+"/api/admin/settings", `{"sensitiveMode":true}`)
 	getJSON(t, http.DefaultClient, ts.URL+"/api/public/banner", &b)
-	if b["sensitiveMode"] != true || b["sensitiveMessage"] != "Secret project" || len(b) != 2 {
+	// Nothing else is public: lockdown is only on/off, not who or why.
+	if b["sensitiveMode"] != true || b["sensitiveMessage"] != "Secret project" || b["lockdown"] != false || len(b) != 3 {
 		t.Fatalf("banner: %v", b)
 	}
 }

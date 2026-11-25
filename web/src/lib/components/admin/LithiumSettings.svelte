@@ -4,13 +4,17 @@
 	import TicketSettings from './TicketSettings.svelte';
 	import UserSettings from './UserSettings.svelte';
 	import AppearanceSettings from './AppearanceSettings.svelte';
+	import EmailSettings from './EmailSettings.svelte';
+	import LockdownSettings from './LockdownSettings.svelte';
 
 	// Application-wide configuration, split into sections. Each section is
 	// empty for now; real settings get added to the matching block below.
 	const sections = [
 		{ id: 'tickets', label: 'Tickets', noun: 'ticket', icon: 'ticket', description: 'Defaults and rules for how tickets are raised and worked.' },
 		{ id: 'appearance', label: 'Appearance', noun: 'appearance', icon: 'palette', description: 'Your branding, colours and how Lithium looks for everyone.' },
-		{ id: 'users', label: 'Users', noun: 'user', icon: 'users', description: 'Sign-in, password rules and defaults for new accounts.' }
+		{ id: 'users', label: 'Users', noun: 'user', icon: 'users', description: 'Sign-in, password rules and defaults for new accounts.' },
+		{ id: 'email', label: 'Email', noun: 'email', icon: 'mail', description: 'The mail server Lithium sends notification emails through.' },
+		{ id: 'lockdown', label: 'Lockdown', noun: 'lockdown', icon: 'lock', description: 'Emergency mode: sign everyone else out and stop anyone signing in.' }
 	] as const satisfies readonly { id: string; label: string; noun: string; icon: IconName; description: string }[];
 
 	type SectionId = (typeof sections)[number]['id'];
@@ -68,6 +72,10 @@
 			<UserSettings />
 		{:else if current.id === 'appearance'}
 			<AppearanceSettings />
+		{:else if current.id === 'email'}
+			<EmailSettings />
+		{:else if current.id === 'lockdown'}
+			<LockdownSettings />
 		{/if}
 	</section>
 </div>

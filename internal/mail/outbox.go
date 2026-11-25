@@ -22,7 +22,12 @@ const (
 
 // Outbox works through queued emails in the background.
 type Outbox struct {
-	Store    *store.Store
+	Store *store.Store
+	// Setup, when set, is asked for the sender and from address before each
+	// batch, so email set up (or changed) in the app applies without a
+	// restart. ok=false means email is off: nothing is sent and queued
+	// emails wait. When nil, Sender and From are used as they are.
+	Setup    func(ctx context.Context) (sender Sender, from string, ok bool)
 	Sender   Sender
 	From     string
 	FromName func(ctx context.Context) string // looked up per batch, so branding changes apply
@@ -73,9 +78,16 @@ func (o *Outbox) SendDue(ctx context.Context) {
 		if len(due) == 0 {
 			return
 		}
+		sender, from := o.Sender, o.From
+		if o.Setup != nil {
+			var ok bool
+			if sender, from, ok = o.Setup(ctx); !ok {
+				return
+			}
+		}
 		fromName := o.FromName(ctx)
 		for _, e := range due {
-			o.send(ctx, e, fromName)
+			o.send(ctx, sender, from, e, fromName)
 		}
 		if len(due) < batchSize {
 			return
@@ -83,9 +95,9 @@ func (o *Outbox) SendDue(ctx context.Context) {
 	}
 }
 
-func (o *Outbox) send(ctx context.Context, e store.OutboxEmail, fromName string) {
+func (o *Outbox) send(ctx context.Context, sender Sender, from string, e store.OutboxEmail, fromName string) {
 	sendCtx, cancel := context.WithTimeout(ctx, 90*time.Second)
-	err := o.Sender.Send(sendCtx, Message{FromName: fromName, From: o.From, To: e.To, Subject: e.Subject, Body: e.Body})
+	err := sender.Send(sendCtx, Message{FromName: fromName, From: from, To: e.To, Subject: e.Subject, Body: e.Body})
 	cancel()
 	if ctx.Err() != nil {
 		return // shutting down; it'll be retried next start

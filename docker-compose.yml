@@ -4,13 +4,14 @@ services:
     image: lithium:latest
     restart: unless-stopped
     ports:
-      - "8080:8080"
+      - "${LITHIUM_PORT:-8080}:8080"
     volumes:
       - lithium-data:/data
     environment:
       # Creates the first admin on first start (ignored once any user exists).
       LITHIUM_ADMIN_EMAIL: ${LITHIUM_ADMIN_EMAIL:-admin@example.com}
       LITHIUM_ADMIN_PASSWORD: ${LITHIUM_ADMIN_PASSWORD:?set LITHIUM_ADMIN_PASSWORD in .env}
+      LITHIUM_ADMIN_NAME: ${LITHIUM_ADMIN_NAME:-Administrator}
       # Set to true when serving over HTTPS (e.g. behind Caddy/Traefik).
       LITHIUM_SECURE_COOKIES: ${LITHIUM_SECURE_COOKIES:-false}
       LITHIUM_TRUST_PROXY: ${LITHIUM_TRUST_PROXY:-false}

@@ -43,7 +43,8 @@
 			}
 			await goto(nextPath(), { invalidateAll: true, replaceState: true });
 		} catch (err) {
-			if (err instanceof ApiError && err.status === 401) error = 'Incorrect email or password.';
+			if (err instanceof ApiError && err.status === 423) error = err.message;
+			else if (err instanceof ApiError && err.status === 401) error = 'Incorrect email or password.';
 			else if (err instanceof ApiError && err.status === 429)
 				error = 'Too many attempts. Please wait a minute and try again.';
 			else error = 'Something went wrong. Please try again.';
@@ -120,6 +121,15 @@
 				</p>
 			{/if}
 		</div>
+
+		{#if page.data.banner?.lockdown && step === 'password'}
+			<div role="note" class="mb-5 rounded-xl border border-danger-400/40 bg-danger-400/10 px-4 py-3 text-sm text-danger-200">
+				<p class="font-semibold">Lithium is in lockdown mode</p>
+				<p class="mt-0.5 text-danger-200/80">
+					Signing in is turned off while an administrator deals with a security issue. Please try again later.
+				</p>
+			</div>
+		{/if}
 
 		{#if step === 'code'}
 			<form

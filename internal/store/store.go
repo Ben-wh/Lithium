@@ -40,6 +40,9 @@ type User struct {
 	// code after the password), "setup" (2FA is mandatory but not set up),
 	// or "" when nothing. Set by the server, not stored.
 	TwoFactor string `json:"twoFactor"`
+	// CanSkipTwoFactor is true while TwoFactor is "setup" and this is the
+	// admin created at first startup, who may skip setup once. Not stored.
+	CanSkipTwoFactor bool `json:"canSkipTwoFactor,omitempty"`
 }
 
 const userCols = `u.id, u.email, u.name, u.role, u.password_hash, u.created_at, u.must_change_password, u.avatar, u.totp_enabled, u.totp_secret, u.totp_last_step, u.email_notifications, u.email_events`

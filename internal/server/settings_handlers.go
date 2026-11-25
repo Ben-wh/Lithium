@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -19,13 +20,15 @@ func (s *Server) handleGetSettings(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
-	writeJSON(w, http.StatusOK, s.withServerSettings(st))
+	writeJSON(w, http.StatusOK, s.withServerSettings(r.Context(), st))
 }
 
 // withServerSettings fills in the settings that come from the server's
 // config rather than the database.
-func (s *Server) withServerSettings(st store.Settings) store.Settings {
-	st.EmailConfigured = s.cfg.Mail.Enabled()
+func (s *Server) withServerSettings(ctx context.Context, st store.Settings) store.Settings {
+	if m, err := s.mailSetup(ctx); err == nil {
+		st.EmailConfigured = m.on()
+	}
 	return st
 }
 
@@ -125,7 +128,7 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.log.Info("settings updated", "by", userFrom(r.Context()).ID)
-	writeJSON(w, http.StatusOK, s.withServerSettings(st))
+	writeJSON(w, http.StatusOK, s.withServerSettings(r.Context(), st))
 }
 
 // handlePublicBanner returns only the sensitive mode banner, without needing
@@ -137,7 +140,14 @@ func (s *Server) handlePublicBanner(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
-	out := map[string]any{"sensitiveMode": st.SensitiveMode, "sensitiveMessage": ""}
+	lockdown, err := s.store.Lockdown(r.Context())
+	if err != nil {
+		s.log.Error("read lockdown state", "err", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	// Only whether lockdown is on is public, not who started it or why.
+	out := map[string]any{"sensitiveMode": st.SensitiveMode, "sensitiveMessage": "", "lockdown": lockdown.Active}
 	if st.SensitiveMode {
 		out["sensitiveMessage"] = st.SensitiveMessage
 	}

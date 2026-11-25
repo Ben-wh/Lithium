@@ -89,22 +89,45 @@ func (c Config) Validate() error {
 	if !c.Mail.Enabled() {
 		return nil
 	}
-	if c.Mail.From == "" {
-		return errors.New("LITHIUM_SMTP_FROM must be set when LITHIUM_SMTP_HOST is")
-	}
-	if _, err := mail.ParseAddress(c.Mail.From); err != nil {
-		return fmt.Errorf("LITHIUM_SMTP_FROM: %w", err)
-	}
-	switch c.Mail.TLS {
-	case "starttls", "tls", "none":
-	default:
-		return fmt.Errorf("LITHIUM_SMTP_TLS must be starttls, tls or none, not %q", c.Mail.TLS)
+	if err := c.Mail.Validate(); err != nil {
+		return fmt.Errorf("LITHIUM_SMTP_* settings: %w", err)
 	}
 	if c.BaseURL != "" {
-		u, err := url.Parse(c.BaseURL)
-		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
-			return fmt.Errorf("LITHIUM_BASE_URL must be a full URL like https://help.example.com, not %q", c.BaseURL)
+		if err := ValidateBaseURL(c.BaseURL); err != nil {
+			return fmt.Errorf("LITHIUM_BASE_URL: %w", err)
 		}
+	}
+	return nil
+}
+
+// Validate checks an SMTP setup, whether it came from environment variables
+// or from an admin in settings. Messages name the setting, not the variable.
+func (m Mail) Validate() error {
+	if strings.TrimSpace(m.Host) == "" || strings.ContainsAny(m.Host, " /:@") {
+		return errors.New("the SMTP server must be a host name like smtp.example.com")
+	}
+	if m.Port < 1 || m.Port > 65535 {
+		return errors.New("the SMTP port must be between 1 and 65535")
+	}
+	if m.From == "" {
+		return errors.New("the from address is required")
+	}
+	if a, err := mail.ParseAddress(m.From); err != nil || a.Name != "" {
+		return fmt.Errorf("the from address must be a plain email address like help@example.com, not %q", m.From)
+	}
+	switch m.TLS {
+	case "starttls", "tls", "none":
+	default:
+		return fmt.Errorf("encryption must be starttls, tls or none, not %q", m.TLS)
+	}
+	return nil
+}
+
+// ValidateBaseURL checks the address emails link to.
+func ValidateBaseURL(s string) error {
+	u, err := url.Parse(s)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+		return fmt.Errorf("must be a full URL like https://help.example.com, not %q", s)
 	}
 	return nil
 }

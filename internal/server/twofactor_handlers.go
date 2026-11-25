@@ -182,7 +182,36 @@ func (s *Server) handleEnableTwoFactor(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.log.Info("two-factor enabled", "user_id", user.ID)
+	// Set up properly, so the first admin's one-time skip is no longer offered.
+	if err := s.store.EndFirstAdminTwoFactorSkip(r.Context(), user.ID); err != nil {
+		s.log.Error("end first admin two-factor skip", "err", err)
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"recoveryCodes": codes})
+}
+
+// handleSkipTwoFactor lets the admin created at first startup skip mandatory
+// two-factor setup, once, which turns mandatory two-factor off for everyone.
+// Meant for trying Lithium out; admins can turn it back on in settings.
+func (s *Server) handleSkipTwoFactor(w http.ResponseWriter, r *http.Request) {
+	user := userFrom(r.Context())
+	if user.TwoFactor != "setup" || !user.CanSkipTwoFactor {
+		writeError(w, http.StatusForbidden, "two-factor setup can't be skipped")
+		return
+	}
+	ok, err := s.store.SkipFirstAdminTwoFactor(r.Context(), user.ID)
+	if err != nil {
+		s.log.Error("skip two-factor", "err", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	if !ok {
+		writeError(w, http.StatusForbidden, "two-factor setup can't be skipped")
+		return
+	}
+	s.log.Warn("first admin skipped two-factor setup; mandatory two-factor is now off", "user_id", user.ID, "ip", s.clientIP(r))
+	user.TwoFactor = ""
+	user.CanSkipTwoFactor = false
+	writeJSON(w, http.StatusOK, user)
 }
 
 func newRecoveryCodes() (codes, hashes []string, err error) {

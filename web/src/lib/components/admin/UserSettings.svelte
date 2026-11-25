@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { invalidate, invalidateAll } from '$app/navigation';
-	import { adminSettings, ApiError, getSettings, sendTestEmail, type Settings } from '$lib/api';
+	import { adminSettings, getSettings, type Settings } from '$lib/api';
 	import Icon from '$lib/components/Icon.svelte';
 	import Toggle from '$lib/components/Toggle.svelte';
 	import Modal from '$lib/components/Modal.svelte';
@@ -19,23 +19,6 @@
 			loadFailed = true;
 		}
 	});
-
-	// --- Test email: sent straight away, so SMTP mistakes show up here ---
-	let testState = $state<'idle' | 'sending' | 'sent' | 'error'>('idle');
-	let testMessage = $state('');
-
-	async function testEmail() {
-		testState = 'sending';
-		try {
-			const { sentTo } = await sendTestEmail();
-			testState = 'sent';
-			testMessage = `Sent to ${sentTo}. If it doesn't arrive, check your spam folder.`;
-		} catch (e) {
-			testState = 'error';
-			const reason = e instanceof ApiError ? e.message : 'something went wrong';
-			testMessage = reason.charAt(0).toUpperCase() + reason.slice(1) + '.';
-		}
-	}
 
 	// Turning mandatory 2FA off weakens everyone's sign-in, so it asks first.
 	// The switch stays on until the admin confirms.
@@ -109,43 +92,28 @@
 				{/snippet}
 			</Toggle>
 			<div class="my-4 h-px bg-ink-800"></div>
-			<Toggle
-				bind:checked={settings.emailNotifications}
-				disabled={saving || !settings.emailConfigured}
-				onchange={(on) => save({ emailNotifications: on }, () => settings && (settings.emailNotifications = !on))}
-			>
-				Email notifications
-				{#snippet description()}
-					{#if settings?.emailConfigured}
-						Email people about replies, assignments, mentions and changes on their tickets, as well as notifying
-						them in the app. Everyone can turn their own emails off from their profile. Emails never include reply
-						text, and leave out ticket subjects while sensitive mode is on.
-					{:else}
-						Email isn't set up on this server. Set <code class="font-mono text-[12px]">LITHIUM_SMTP_HOST</code> and
-						the other <code class="font-mono text-[12px]">LITHIUM_SMTP_*</code> settings, then restart Lithium.
-					{/if}
-				{/snippet}
-			</Toggle>
-			{#if settings.emailConfigured}
-				<div class="mt-3 flex flex-wrap items-center gap-3">
-					<button
-						type="button"
-						onclick={testEmail}
-						disabled={testState === 'sending'}
-						class="inline-flex h-8 items-center gap-1.5 rounded-lg border border-ink-700 px-3 text-[13px] text-ink-200 transition hover:border-ink-500 hover:text-ink-100 disabled:cursor-not-allowed disabled:opacity-60"
-					>
-						<Icon name="bell" class="size-3.5" />
-						{testState === 'sending' ? 'Sending…' : 'Send test email'}
-					</button>
-					<span aria-live="polite" class="min-w-0 text-xs">
-						{#if testState === 'sent'}
-							<span class="text-ink-400">{testMessage}</span>
-						{:else if testState === 'error'}
-							<span class="break-words text-danger-300">{testMessage}</span>
+			<div class="flex items-start justify-between gap-4">
+				<div class="text-sm">
+					<p class="font-medium text-ink-100">Email notifications</p>
+					<p class="mt-0.5 text-ink-400">
+						{#if !settings.emailConfigured}
+							Email isn't set up yet, so people are only notified in the app.
+						{:else if settings.emailNotifications}
+							On. People are emailed about activity on their tickets.
+						{:else}
+							Off. Email is set up, but notification emails are switched off.
 						{/if}
-					</span>
+					</p>
 				</div>
-			{/if}
+				<a
+					href="?tab=settings&section=email"
+					data-sveltekit-replacestate
+					data-sveltekit-noscroll
+					class="shrink-0 text-[13px] text-primary-300 hover:text-primary-200"
+				>
+					{settings.emailConfigured ? 'Email settings' : 'Set up email'} →
+				</a>
+			</div>
 			<div class="my-4 h-px bg-ink-800"></div>
 			<Toggle
 				bind:checked={settings.disableCustomAvatars}

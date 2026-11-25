@@ -15,14 +15,19 @@
 	const companyName = $derived(page.data.branding?.companyName ?? '');
 	const brandName = $derived(companyName || (page.data.branding?.logoUrl ? '' : 'Lithium'));
 
-	const allLinks: { href: string; label: string; icon: IconName; staffOnly?: boolean }[] = [
+	const allLinks: { href: string; label: string; icon: IconName; staffOnly?: boolean; adminOnly?: boolean }[] = [
 		{ href: '/', label: 'Dashboard', icon: 'home' },
 		{ href: '/tickets', label: 'Tickets', icon: 'ticket' },
 		{ href: '/user-book', label: 'User book', icon: 'users', staffOnly: true },
 		{ href: '/knowledge-base', label: 'Knowledge base', icon: 'book' },
-		{ href: '/reports', label: 'Reports', icon: 'chart', staffOnly: true }
+		{ href: '/reports', label: 'Reports', icon: 'chart', staffOnly: true },
+		{ href: '/activity', label: 'Activity', icon: 'activity', adminOnly: true }
 	];
-	const links = $derived(allLinks.filter((l) => !l.staffOnly || user.role === 'admin' || user.role === 'agent'));
+	const links = $derived(
+		allLinks.filter(
+			(l) => (!l.staffOnly || user.role === 'admin' || user.role === 'agent') && (!l.adminOnly || user.role === 'admin')
+		)
+	);
 
 	const isAdmin = $derived(user.role === 'admin');
 
