@@ -88,6 +88,12 @@ For emergencies, such as a suspected break-in or a leaked password. Under **Sett
 
 You'll need to type `LOCKDOWN`, give an optional reason, and enter your password (and a two-factor code if you use one). Choose **End lockdown** when it's over. If you can't sign in to end it, someone with access to the server can run `lithium end-lockdown`.
 
+## Backups
+
+Under **Settings → Backups**, **Back up now** saves a copy of everything in Lithium: tickets, users, settings, the knowledge base and every uploaded file. Turn on **Back up automatically** to make one every day or week at a set time, keeping the newest few.
+
+Backups are kept on the Lithium server, so **Download** them now and then and keep copies somewhere safe. They contain everything, including email settings, so treat them like a password. Restoring one is done on the server; the instructions are on the Backups page.
+
 ## Activity
 
 **Activity** lists everything people have changed in Lithium over the last year, including sign-ins and refused attempts. Search it, filter by date or type, or choose **Failed only** to see blocked actions. Open an entry for the account, IP address and browser.

@@ -98,6 +98,8 @@ func run(cfg config.Config, log *slog.Logger) error {
 		return err
 	}
 	startEmail(ctx, cfg, st, srv, log)
+	srv.Backups().CleanUp()
+	go srv.Backups().Schedule(ctx)
 	httpSrv := &http.Server{
 		Addr:              cfg.Addr,
 		Handler:           srv.Handler(web.FS()),

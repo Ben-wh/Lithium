@@ -192,13 +192,33 @@ LITHIUM_COMMIT=$(git rev-parse HEAD) docker compose up -d --build
 
 ### Backups
 
-Everything lives in the `lithium-data` Docker volume: the SQLite database, ticket attachments, knowledge base images, avatars and branding. Stop the container briefly for a consistent copy:
+Admins make and download backups under **Settings → Backups**. Each backup is one `.tar.gz` holding a snapshot of the database (taken while Lithium keeps running) and every uploaded file: attachments, knowledge base images, avatars and branding.
+
+- **Back up now** makes a backup straight away.
+- **Scheduled backups** are off by default. Turn them on to back up every day or week at a chosen hour (server time, UTC in Docker), keeping the newest few. Older *scheduled* backups are deleted automatically; manual ones never are.
+
+Backups are kept in the data volume at `/data/backups`, so they don't protect against losing the volume itself. **Download them regularly and keep copies somewhere else.** They contain everything, including password hashes and email settings, so store them securely.
+
+To copy them all off the server at once:
+
+```sh
+docker compose cp lithium:/data/backups ./lithium-backups
+```
+
+#### Restoring
+
+Restoring replaces everything in Lithium with the backup's contents.
 
 ```sh
 docker compose stop
-docker compose cp lithium:/data ./lithium-backup-$(date +%F)
+docker run --rm --volumes-from "$(docker compose ps -aq lithium)" -v "$PWD":/restore alpine sh -c '
+  cd /data && rm -f lithium.db-wal lithium.db-shm &&
+  tar xzf /restore/lithium-backup-2026-11-26T02-00-00Z-scheduled.tar.gz &&
+  chown -R 65532:65532 /data'
 docker compose start
 ```
+
+Replace the file name with your backup's, placed in the current folder. Without Docker, stop Lithium, unpack the backup into the data directory (deleting `lithium.db-wal` and `lithium.db-shm` first), and start it again.
 
 ### Logs and health
 

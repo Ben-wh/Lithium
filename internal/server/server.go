@@ -8,6 +8,7 @@ import (
 	"net/http"
 
 	"github.com/lithium/lithium/internal/auth"
+	"github.com/lithium/lithium/internal/backup"
 	"github.com/lithium/lithium/internal/config"
 	"github.com/lithium/lithium/internal/mail"
 	"github.com/lithium/lithium/internal/store"
@@ -24,6 +25,7 @@ type Server struct {
 	dummyHash    string           // compared against when a login email doesn't exist, to keep timing uniform
 	mailer       mail.Sender      // tests only: replaces the SMTP sender (see senderFor)
 	updates      *updateChecker
+	backups      *backup.Manager
 }
 
 func New(cfg config.Config, st *store.Store, log *slog.Logger) (*Server, error) {
@@ -41,6 +43,7 @@ func New(cfg config.Config, st *store.Store, log *slog.Logger) (*Server, error) 
 		throttle:     newAccountThrottle(),
 		dummyHash:    dummy,
 		updates:      newUpdateChecker(),
+		backups:      backup.New(cfg.DataDir, st, log),
 	}, nil
 }
 
@@ -149,6 +152,11 @@ func (s *Server) Handler(frontend fs.FS) http.Handler {
 	admin("PUT /api/admin/groups/{id}", s.handleUpdateGroup)
 	admin("DELETE /api/admin/groups/{id}", s.handleDeleteGroup)
 	admin("GET /api/admin/updates", s.handleCheckUpdates)
+	admin("GET /api/admin/backups", s.handleGetBackups)
+	admin("PUT /api/admin/backups/settings", s.handleSaveBackupSettings)
+	admin("POST /api/admin/backups", s.handleCreateBackup)
+	admin("GET /api/admin/backups/{name}/download", s.handleDownloadBackup)
+	admin("DELETE /api/admin/backups/{name}", s.handleDeleteBackup)
 
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "not found")

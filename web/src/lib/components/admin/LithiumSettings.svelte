@@ -7,6 +7,7 @@
 	import EmailSettings from './EmailSettings.svelte';
 	import LockdownSettings from './LockdownSettings.svelte';
 	import UpdateSettings from './UpdateSettings.svelte';
+	import BackupSettings from './BackupSettings.svelte';
 
 	// Application-wide configuration, split into sections. Each section is
 	// empty for now; real settings get added to the matching block below.
@@ -16,6 +17,7 @@
 		{ id: 'users', label: 'Users', noun: 'user', icon: 'users', description: 'Sign-in, password rules and defaults for new accounts.' },
 		{ id: 'email', label: 'Email', noun: 'email', icon: 'mail', description: 'The mail server Lithium sends notification emails through.' },
 		{ id: 'lockdown', label: 'Lockdown', noun: 'lockdown', icon: 'lock', description: 'Emergency mode: sign everyone else out and stop anyone signing in.' },
+		{ id: 'backups', label: 'Backups', noun: 'backup', icon: 'archive', description: 'Copies of everything in Lithium, made by hand or on a schedule.' },
 		{ id: 'updates', label: 'Updates', noun: 'update', icon: 'download', description: 'Which version is running, and whether a newer one is on GitHub.' }
 	] as const satisfies readonly { id: string; label: string; noun: string; icon: IconName; description: string }[];
 
@@ -77,6 +79,8 @@
 			<EmailSettings />
 		{:else if current.id === 'lockdown'}
 			<LockdownSettings />
+		{:else if current.id === 'backups'}
+			<BackupSettings />
 		{:else if current.id === 'updates'}
 			<UpdateSettings />
 		{/if}

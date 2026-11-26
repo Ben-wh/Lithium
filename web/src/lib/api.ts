@@ -778,3 +778,39 @@ export const updates = {
 	/** refresh asks GitHub again instead of using the last answer. */
 	check: (refresh = false) => request<UpdateStatus>(`/api/admin/updates${refresh ? '?refresh=1' : ''}`)
 };
+
+// --- Backups (admins) ---
+
+export type BackupSettings = {
+	enabled: boolean;
+	frequency: 'daily' | 'weekly';
+	/** 0-23, in the server's time zone. */
+	hour: number;
+	/** Scheduled backups to keep; older ones are deleted. */
+	keep: number;
+};
+
+export type Backup = { name: string; kind: 'manual' | 'scheduled'; size: number; createdAt: string };
+
+export type BackupStatus = {
+	settings: BackupSettings;
+	backups: Backup[];
+	running: boolean;
+	/** Why the most recent backup failed ("" if it didn't). */
+	lastError: string;
+	nextRun?: string;
+	/** The server's time zone, which `hour` is in, e.g. "UTC". */
+	timeZone: string;
+	/** Where backups are kept on the server. */
+	folder: string;
+};
+
+export const backups = {
+	get: () => request<BackupStatus>('/api/admin/backups'),
+	saveSettings: (s: BackupSettings) =>
+		request<BackupStatus>('/api/admin/backups/settings', { method: 'PUT', body: JSON.stringify(s) }),
+	/** Starts a backup in the background; poll get() until running is false. */
+	create: () => request<void>('/api/admin/backups', { method: 'POST', body: '{}' }),
+	downloadUrl: (name: string) => `/api/admin/backups/${encodeURIComponent(name)}/download`,
+	delete: (name: string) => request<void>(`/api/admin/backups/${encodeURIComponent(name)}`, { method: 'DELETE' })
+};

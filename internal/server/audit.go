@@ -96,6 +96,10 @@ var auditRoutes = map[string]auditRoute{
 	"PUT /api/admin/email":                    {action: "settings.email", category: catSettings, summary: "Changed the email setup", fields: []string{"host", "port", "username", "from", "tls", "baseUrl"}},
 	"DELETE /api/admin/email":                 {action: "settings.email_delete", category: catSettings, summary: "Turned off email"},
 	"POST /api/admin/email/test":              {action: "settings.email_test", category: catSettings, summary: "Sent a test email"},
+	"POST /api/admin/backups":                 {action: "backup.create", category: catSystem, summary: "Started a backup"},
+	"PUT /api/admin/backups/settings":         {action: "backup.settings", category: catSystem, summary: "Changed the backup schedule", fields: []string{"*"}},
+	"GET /api/admin/backups/{name}/download":  {action: "backup.download", category: catSystem, summary: "Downloaded a backup"},
+	"DELETE /api/admin/backups/{name}":        {action: "backup.delete", category: catSystem, summary: "Deleted a backup"},
 	"POST /api/admin/lockdown":                {action: "security.lockdown_start", category: catSettings, summary: "Started lockdown mode: everyone else signed out", failSummary: "Tried to start lockdown mode"},
 	"POST /api/admin/lockdown/end":            {action: "security.lockdown_end", category: catSettings, summary: "Ended lockdown mode"},
 	"POST /api/admin/ticket-templates":        {action: "template.create", category: catSettings, summary: "Created a ticket template", target: "template", create: true},
@@ -145,6 +149,9 @@ type auditRecorder struct {
 	keep   bool
 	body   bytes.Buffer
 }
+
+// Unwrap lets http.ResponseController reach the real writer.
+func (r *auditRecorder) Unwrap() http.ResponseWriter { return r.ResponseWriter }
 
 func (r *auditRecorder) WriteHeader(code int) {
 	r.status = code
