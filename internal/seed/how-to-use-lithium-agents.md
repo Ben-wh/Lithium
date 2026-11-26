@@ -13,13 +13,16 @@ The **Dashboard** shows what's happening in the queue and the latest activity.
 
 ## Working the queue
 
-**Tickets** lists every ticket you can see, newest first.
+**Tickets** lists every ticket you can see, most recently updated first.
 
 - **Tabs** filter by status. **Active** (the default) shows everything not yet resolved or closed.
 - **Search** by subject, requester or reference (for example **TID-42**).
 - **Filters** narrow by priority, category and assignee: **Assigned to me** and **Unassigned** are the quickest ways to find your next ticket.
+- **Sort** by last updated, date raised, priority, status, subject or assignee.
 
-The filters are kept in the address, so you can bookmark a view you use often.
+The filters and sort are kept in the address, so you can bookmark a view you use often.
+
+To change many tickets at once, press **Select**, tick the tickets (shift-click ticks a range), then use the bar at the bottom to assign them or change their status, priority or category. Lithium asks you to confirm, then updates each ticket as if you'd changed it by hand. Any it can't change, such as tickets outside the assignee's groups, are listed with the reason.
 
 > **Which tickets can I see?** Usually all of them. If your admin has turned on **agent groups**, you see tickets in your groups' categories, tickets with no category, and any ticket you raised or are assigned.
 

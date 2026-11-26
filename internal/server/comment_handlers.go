@@ -2,8 +2,10 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"unicode/utf8"
@@ -118,6 +120,82 @@ func optionalID(raw json.RawMessage) (set bool, id int64, err error) {
 	return true, id, err
 }
 
+// ticketUpdateRequest is the change a single or bulk update asks for. Absent
+// fields are left alone; null clears the category or assignee.
+type ticketUpdateRequest struct {
+	Status     *string         `json:"status"`
+	Priority   *string         `json:"priority"`
+	CategoryID json.RawMessage `json:"categoryId"`
+	AssigneeID json.RawMessage `json:"assigneeId"`
+}
+
+// toUpdate checks the request's own values (not anything that depends on a
+// particular ticket); a non-empty message is a 400 for the user.
+func (req ticketUpdateRequest) toUpdate() (store.TicketUpdate, string) {
+	u := store.TicketUpdate{Status: req.Status, Priority: req.Priority}
+	var err error
+	if u.SetCategory, u.CategoryID, err = optionalID(req.CategoryID); err != nil {
+		return u, "categoryId must be a number or null"
+	}
+	if u.SetAssignee, u.AssigneeID, err = optionalID(req.AssigneeID); err != nil {
+		return u, "assigneeId must be a number or null"
+	}
+	if u.Status != nil && !validStatuses[*u.Status] {
+		return u, "unknown status"
+	}
+	if u.Priority != nil && !validPriorities[*u.Priority] {
+		return u, "unknown priority"
+	}
+	return u, ""
+}
+
+// checkTicketUpdate checks u against one ticket: the category must exist and
+// the assignee must be staff whose groups cover the ticket. A non-empty
+// message is the reason it can't be applied.
+func (s *Server) checkTicketUpdate(ctx context.Context, current store.Ticket, u store.TicketUpdate) (string, error) {
+	if u.SetCategory && u.CategoryID != 0 {
+		c, err := s.store.CategoryByID(ctx, u.CategoryID)
+		if errors.Is(err, store.ErrNotFound) || (err == nil && c.Archived) {
+			return "category not found", nil
+		} else if err != nil {
+			return "", fmt.Errorf("lookup category: %w", err)
+		}
+	}
+	if u.SetAssignee && u.AssigneeID != 0 && (current.Assignee == nil || current.Assignee.ID != u.AssigneeID) {
+		a, err := s.store.UserByID(ctx, u.AssigneeID)
+		if errors.Is(err, store.ErrNotFound) || (err == nil && !isStaff(a)) {
+			return "tickets can only be assigned to admins or agents", nil
+		} else if err != nil {
+			return "", fmt.Errorf("lookup assignee: %w", err)
+		}
+		// With agent groups on, only agents whose groups cover the ticket.
+		if ok, err := s.canBeAssigned(ctx, a, current); err != nil {
+			return "", fmt.Errorf("check access: %w", err)
+		} else if !ok {
+			return a.Name + "'s groups don't cover this ticket's category", nil
+		}
+	}
+	return "", nil
+}
+
+// applyTicketUpdate saves u, records it in the conversation and notifies
+// people, returning the updated ticket.
+func (s *Server) applyTicketUpdate(ctx context.Context, id int64, actor store.User, u store.TicketUpdate) (store.Ticket, error) {
+	changes, err := s.store.UpdateTicket(ctx, id, actor.ID, u)
+	if err != nil {
+		return store.Ticket{}, err
+	}
+	t, err := s.store.TicketByID(ctx, id)
+	if err != nil {
+		return store.Ticket{}, err
+	}
+	if len(changes) > 0 {
+		s.log.Info("ticket updated", "ticket_id", id, "changes", len(changes), "by", actor.ID)
+		s.notifyUpdate(ctx, t, actor, changes)
+	}
+	return t, nil
+}
+
 // handleUpdateTicket lets staff change status, priority, category and
 // assignee. Each change is recorded in the conversation as a Lithium update.
 func (s *Server) handleUpdateTicket(w http.ResponseWriter, r *http.Request) {
@@ -125,69 +203,24 @@ func (s *Server) handleUpdateTicket(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	id := current.ID
-	var req struct {
-		Status     *string         `json:"status"`
-		Priority   *string         `json:"priority"`
-		CategoryID json.RawMessage `json:"categoryId"`
-		AssigneeID json.RawMessage `json:"assigneeId"`
-	}
+	var req ticketUpdateRequest
 	if !decodeJSON(w, r, &req) {
 		return
 	}
-	u := store.TicketUpdate{Status: req.Status, Priority: req.Priority}
-	var err error
-	if u.SetCategory, u.CategoryID, err = optionalID(req.CategoryID); err != nil {
-		writeError(w, http.StatusBadRequest, "categoryId must be a number or null")
-		return
-	}
-	if u.SetAssignee, u.AssigneeID, err = optionalID(req.AssigneeID); err != nil {
-		writeError(w, http.StatusBadRequest, "assigneeId must be a number or null")
-		return
-	}
-
-	if u.Status != nil && !validStatuses[*u.Status] {
-		writeError(w, http.StatusBadRequest, "unknown status")
-		return
-	}
-	if u.Priority != nil && !validPriorities[*u.Priority] {
-		writeError(w, http.StatusBadRequest, "unknown priority")
-		return
-	}
-	if u.SetCategory && u.CategoryID != 0 {
-		c, err := s.store.CategoryByID(r.Context(), u.CategoryID)
-		if errors.Is(err, store.ErrNotFound) || (err == nil && c.Archived) {
-			writeError(w, http.StatusBadRequest, "category not found")
-			return
-		} else if err != nil {
-			s.log.Error("lookup category", "err", err)
+	u, msg := req.toUpdate()
+	if msg == "" {
+		var err error
+		if msg, err = s.checkTicketUpdate(r.Context(), current, u); err != nil {
+			s.log.Error("check ticket update", "err", err)
 			writeError(w, http.StatusInternalServerError, "internal error")
 			return
 		}
 	}
-	if u.SetAssignee && u.AssigneeID != 0 && (current.Assignee == nil || current.Assignee.ID != u.AssigneeID) {
-		a, err := s.store.UserByID(r.Context(), u.AssigneeID)
-		if errors.Is(err, store.ErrNotFound) || (err == nil && !isStaff(a)) {
-			writeError(w, http.StatusBadRequest, "tickets can only be assigned to admins or agents")
-			return
-		} else if err != nil {
-			s.log.Error("lookup assignee", "err", err)
-			writeError(w, http.StatusInternalServerError, "internal error")
-			return
-		}
-		// With agent groups on, only agents whose groups cover the ticket.
-		if ok, err := s.canBeAssigned(r.Context(), a, current); err != nil {
-			s.log.Error("check access", "err", err)
-			writeError(w, http.StatusInternalServerError, "internal error")
-			return
-		} else if !ok {
-			writeError(w, http.StatusBadRequest, a.Name+"'s groups don't cover this ticket's category")
-			return
-		}
+	if msg != "" {
+		writeError(w, http.StatusBadRequest, msg)
+		return
 	}
-
-	actor := userFrom(r.Context())
-	changes, err := s.store.UpdateTicket(r.Context(), id, actor.ID, u)
+	t, err := s.applyTicketUpdate(r.Context(), current.ID, userFrom(r.Context()), u)
 	if errors.Is(err, store.ErrNotFound) {
 		writeError(w, http.StatusNotFound, "ticket not found")
 		return
@@ -196,17 +229,94 @@ func (s *Server) handleUpdateTicket(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
-	t, err := s.store.TicketByID(r.Context(), id)
-	if err != nil {
-		s.log.Error("get ticket", "err", err)
-		writeError(w, http.StatusInternalServerError, "internal error")
+	writeJSON(w, http.StatusOK, t)
+}
+
+const maxBulkTickets = 100
+
+type bulkSkip struct {
+	ID     int64  `json:"id"`
+	Reason string `json:"reason"`
+}
+
+// handleBulkUpdateTickets applies one change (status, priority, category
+// and/or assignee) to several tickets. Each ticket is checked as if updated on
+// its own; any that can't take the change are skipped with a reason and the
+// rest still update.
+func (s *Server) handleBulkUpdateTickets(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		IDs []int64 `json:"ids"`
+		ticketUpdateRequest
+	}
+	if !decodeJSON(w, r, &req) {
 		return
 	}
-	if len(changes) > 0 {
-		s.log.Info("ticket updated", "ticket_id", id, "changes", len(changes), "by", actor.ID)
-		s.notifyUpdate(r.Context(), t, actor, changes)
+	switch {
+	case len(req.IDs) == 0:
+		writeError(w, http.StatusBadRequest, "choose at least one ticket")
+		return
+	case len(req.IDs) > maxBulkTickets:
+		writeError(w, http.StatusBadRequest, fmt.Sprintf("you can change up to %d tickets at once", maxBulkTickets))
+		return
 	}
-	writeJSON(w, http.StatusOK, t)
+	u, msg := req.toUpdate()
+	if msg != "" {
+		writeError(w, http.StatusBadRequest, msg)
+		return
+	}
+	if u.Status == nil && u.Priority == nil && !u.SetCategory && !u.SetAssignee {
+		writeError(w, http.StatusBadRequest, "choose a change to make")
+		return
+	}
+
+	ctx := r.Context()
+	actor := userFrom(ctx)
+	res := struct {
+		Updated int        `json:"updated"`
+		Skipped []bulkSkip `json:"skipped"`
+	}{Skipped: []bulkSkip{}}
+	seen := map[int64]bool{}
+	for _, id := range req.IDs {
+		if seen[id] {
+			continue
+		}
+		seen[id] = true
+		t, err := s.store.TicketByID(ctx, id)
+		if errors.Is(err, store.ErrNotFound) {
+			res.Skipped = append(res.Skipped, bulkSkip{id, "ticket not found"})
+			continue
+		} else if err != nil {
+			s.log.Error("get ticket", "err", err)
+			writeError(w, http.StatusInternalServerError, "internal error")
+			return
+		}
+		// Tickets outside an agent's groups look the same as missing ones.
+		if ok, err := s.userCanView(ctx, actor, t); err != nil {
+			s.log.Error("check access", "err", err)
+			writeError(w, http.StatusInternalServerError, "internal error")
+			return
+		} else if !ok {
+			res.Skipped = append(res.Skipped, bulkSkip{id, "ticket not found"})
+			continue
+		}
+		msg, err := s.checkTicketUpdate(ctx, t, u)
+		if err != nil {
+			s.log.Error("check ticket update", "err", err)
+			writeError(w, http.StatusInternalServerError, "internal error")
+			return
+		}
+		if msg != "" {
+			res.Skipped = append(res.Skipped, bulkSkip{id, msg})
+			continue
+		}
+		if _, err := s.applyTicketUpdate(ctx, id, actor, u); err != nil {
+			s.log.Error("bulk update ticket", "ticket_id", id, "err", err)
+			writeError(w, http.StatusInternalServerError, "internal error")
+			return
+		}
+		res.Updated++
+	}
+	writeJSON(w, http.StatusOK, res)
 }
 
 // handleReopenTicket moves a resolved, closed or raised-in-error ticket back

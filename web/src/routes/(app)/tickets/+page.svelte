@@ -1,5 +1,7 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
+	import { goto, invalidateAll } from '$app/navigation';
+	import { SvelteSet } from 'svelte/reactivity';
+	import BulkActions from '$lib/components/BulkActions.svelte';
 	import { page } from '$app/state';
 	import { tickets, type Priority, type TicketSummary } from '$lib/api';
 	import Avatar from '$lib/components/Avatar.svelte';
@@ -7,7 +9,7 @@
 	import Icon from '$lib/components/Icon.svelte';
 	import PriorityIcon from '$lib/components/PriorityIcon.svelte';
 	import TicketRow from '$lib/components/TicketRow.svelte';
-	import { priorities, TICKET_PAGE_SIZE, ticketSorts, ticketViews as views, type TicketView as View } from '$lib/tickets';
+	import { priorities, TICKET_PAGE_SIZE, ticketRef, ticketSorts, ticketViews as views, type TicketView as View } from '$lib/tickets';
 
 	let { data } = $props();
 
@@ -31,6 +33,53 @@
 		} finally {
 			loadingMore = false;
 		}
+	}
+
+	// --- Select mode (staff): tick tickets, then change them all at once ---
+	let selecting = $state(false);
+	const selected = new SvelteSet<number>();
+	let lastClicked = -1; // index, for shift-click ranges
+	let bulkNotice = $state<{ text: string; skipped: { id: number; reason: string }[] } | null>(null);
+
+	// A new list (filters, sort, view) starts a fresh selection.
+	$effect(() => {
+		void data.list;
+		selected.clear();
+		lastClicked = -1;
+	});
+
+	function toggleSelecting() {
+		selecting = !selecting;
+		selected.clear();
+		lastClicked = -1;
+		bulkNotice = null;
+	}
+
+	function select(i: number, e: MouseEvent) {
+		const id = items[i].id;
+		const on = !selected.has(id);
+		// Shift-click sets everything between the last click and this one.
+		const [from, to] = e.shiftKey && lastClicked >= 0 ? [Math.min(lastClicked, i), Math.max(lastClicked, i)] : [i, i];
+		for (let k = from; k <= to; k++) {
+			if (on) selected.add(items[k].id);
+			else selected.delete(items[k].id);
+		}
+		lastClicked = i;
+	}
+
+	const allShown = $derived(items.length > 0 && items.every((t) => selected.has(t.id)));
+	function selectAll() {
+		if (allShown) selected.clear();
+		else for (const t of items.slice(0, 100)) selected.add(t.id); // the server takes up to 100 at once
+	}
+
+	async function bulkDone(res: { updated: number; skipped: { id: number; reason: string }[]; what: string }) {
+		const n = res.updated;
+		bulkNotice = {
+			text: `${res.what}: ${n} ${n === 1 ? 'ticket' : 'tickets'} updated.`,
+			skipped: res.skipped
+		};
+		await invalidateAll(); // reload the list; this also clears the selection
 	}
 
 	function setParams(changes: Record<string, string>) {
@@ -97,6 +146,22 @@
 				{data.list.total === 1 ? 'ticket' : 'tickets'}{filtered ? ' matching your filters' : ''}
 			</p>
 		</div>
+		{#if isStaff && items.length > 0}
+			<button
+				type="button"
+				onclick={toggleSelecting}
+				aria-pressed={selecting}
+				class={[
+					'inline-flex h-9 items-center gap-1.5 rounded-lg border px-3.5 text-sm font-medium transition',
+					selecting
+						? 'border-primary-400/50 bg-primary-400/10 text-primary-200 hover:bg-primary-400/15'
+						: 'border-ink-700 text-ink-200 hover:border-ink-500 hover:text-ink-100'
+				]}
+			>
+				<Icon name={selecting ? 'close' : 'check'} class="size-4" />
+				{selecting ? 'Done' : 'Select'}
+			</button>
+		{/if}
 	</div>
 
 	<!-- Status views -->
@@ -240,8 +305,55 @@
 		</div>
 	</div>
 
+	{#if bulkNotice}
+		<div role="status" class="mt-4 rounded-lg border border-ink-700 bg-ink-900 px-3.5 py-2.5 text-sm text-ink-200">
+			<div class="flex items-start gap-2.5">
+				<Icon name="check" class="mt-0.5 size-4 shrink-0 text-primary-300" />
+				<div class="min-w-0 flex-1">
+					<p>{bulkNotice.text}{bulkNotice.skipped.length ? ` ${bulkNotice.skipped.length} skipped:` : ''}</p>
+					{#if bulkNotice.skipped.length}
+						<ul class="mt-1 space-y-0.5 text-xs text-ink-400">
+							{#each bulkNotice.skipped as sk (sk.id)}
+								<li>
+									<a href="/tickets/{sk.id}" class="font-mono text-ink-300 hover:text-primary-300">{ticketRef(sk.id, data.settings.ticketPrefix)}</a>
+									· {sk.reason.charAt(0).toUpperCase() + sk.reason.slice(1)}
+								</li>
+							{/each}
+						</ul>
+					{/if}
+				</div>
+				<button type="button" onclick={() => (bulkNotice = null)} aria-label="Dismiss" class="text-ink-500 hover:text-ink-100">
+					<Icon name="close" class="size-4" />
+				</button>
+			</div>
+		</div>
+	{/if}
+
 	<!-- List -->
 	<div class="mt-4 overflow-hidden rounded-xl border border-ink-800 bg-ink-900/60">
+		{#if selecting && items.length > 0}
+			<div class="flex items-center gap-3 border-b border-ink-800 px-4 py-2.5 text-[13px] sm:px-5">
+				<button
+					type="button"
+					role="checkbox"
+					aria-checked={allShown ? 'true' : selected.size > 0 ? 'mixed' : 'false'}
+					onclick={selectAll}
+					class="flex items-center gap-2.5 text-ink-300 hover:text-ink-100"
+				>
+					<span
+						aria-hidden="true"
+						class={[
+							'flex size-4 items-center justify-center rounded border',
+							selected.size > 0 ? 'border-primary-400 bg-primary-400 text-primary-950' : 'border-ink-600'
+						]}
+					>
+						{#if allShown}<Icon name="check" class="size-3" />{:else if selected.size > 0}<span class="h-0.5 w-2 rounded bg-current"></span>{/if}
+					</span>
+					{allShown ? 'Deselect all' : `Select all ${Math.min(items.length, 100)} shown`}
+				</button>
+				<span class="ml-auto hidden text-ink-500 sm:inline">Shift-click to select a range</span>
+			</div>
+		{/if}
 		{#if items.length === 0}
 			<div class="flex flex-col items-center px-6 py-16 text-center">
 				<span class="flex size-11 items-center justify-center rounded-xl bg-primary-400/10 text-primary-400">
@@ -261,8 +373,16 @@
 			</div>
 		{:else}
 			<ul class="divide-y divide-ink-800 p-1.5">
-				{#each items as t (t.id)}
-					<li><TicketRow ticket={t} showRequester={isStaff} /></li>
+				{#each items as t, i (t.id)}
+					<li>
+						<TicketRow
+							ticket={t}
+							showRequester={isStaff}
+							selectable={selecting}
+							selected={selected.has(t.id)}
+							onselect={(e) => select(i, e)}
+						/>
+					</li>
 				{/each}
 			</ul>
 		{/if}
@@ -280,5 +400,17 @@
 			</button>
 			{#if loadMoreFailed}<p class="text-xs text-danger-300">Couldn't load more tickets. Try again.</p>{/if}
 		</div>
+	{/if}
+
+	{#if selecting}
+		<!-- Room for the action bar, so it never covers the last row. -->
+		<div class="h-20" aria-hidden="true"></div>
+		<BulkActions
+			ids={[...selected]}
+			categories={data.categories}
+			me={data.user?.id}
+			onclear={() => selected.clear()}
+			ondone={bulkDone}
+		/>
 	{/if}
 </div>

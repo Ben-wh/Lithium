@@ -28,6 +28,7 @@
 		searchable = false,
 		size = 'md',
 		menu = 'stretch',
+		placement = 'below',
 		label,
 		onchange
 	}: {
@@ -44,6 +45,8 @@
 		size?: 'sm' | 'md';
 		/** "stretch" matches the button's width; "wide" is a wider menu for narrow buttons. */
 		menu?: 'stretch' | 'wide';
+		/** Open the menu above the button, e.g. in a bar at the bottom of the screen. */
+		placement?: 'below' | 'above';
 		/** Accessible name if there's no <label for={id}>. */
 		label?: string;
 		onchange?: (value: T) => void;
@@ -194,7 +197,8 @@
 	{#if open}
 		<div
 			class={[
-				'absolute top-full z-30 mt-1.5 overflow-hidden rounded-xl border border-ink-800 bg-ink-900 shadow-2xl shadow-shade/40',
+				'absolute z-30 overflow-hidden rounded-xl border border-ink-800 bg-ink-900 shadow-2xl shadow-shade/40',
+				placement === 'above' ? 'bottom-full mb-1.5' : 'top-full mt-1.5',
 				menu === 'wide' ? 'left-0 w-64 max-w-[calc(100vw-2rem)]' : 'inset-x-0'
 			]}
 		>

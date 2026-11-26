@@ -7,20 +7,52 @@
 	import Avatar from './Avatar.svelte';
 	import PriorityIcon from './PriorityIcon.svelte';
 	import StatusBadge from './StatusBadge.svelte';
+	import Icon from './Icon.svelte';
 
-	let { ticket: t, showRequester = false }: { ticket: TicketSummary; showRequester?: boolean } = $props();
+	let {
+		ticket: t,
+		showRequester = false,
+		selectable = false,
+		selected = false,
+		onselect
+	}: {
+		ticket: TicketSummary;
+		showRequester?: boolean;
+		/** Select mode: the row toggles a checkbox instead of opening the ticket. */
+		selectable?: boolean;
+		selected?: boolean;
+		/** Called with the click, so shift-click can select a range. */
+		onselect?: (e: MouseEvent) => void;
+	} = $props();
 	const prefix = $derived(page.data.settings?.ticketPrefix ?? 'TID');
 	const ref = $derived(ticketRef(t.id, prefix));
 </script>
 
-<a
-	href="/tickets/{t.id}"
+<svelte:element
+	this={selectable ? 'button' : 'a'}
+	href={selectable ? undefined : `/tickets/${t.id}`}
+	type={selectable ? 'button' : undefined}
+	role={selectable ? 'checkbox' : undefined}
+	aria-checked={selectable ? selected : undefined}
+	onclick={selectable ? onselect : undefined}
 	class={[
-		'group flex items-center gap-3 rounded-lg px-2.5 py-3 transition hover:bg-ink-850/60 focus-visible:bg-ink-850/60 focus-visible:outline-none sm:gap-4 sm:px-3.5',
+		'group flex w-full items-center gap-3 rounded-lg px-2.5 py-3 text-left transition hover:bg-ink-850/60 focus-visible:bg-ink-850/60 focus-visible:outline-none sm:gap-4 sm:px-3.5',
 		// Urgent tickets get a red outline. Inset so it doesn't shift the layout or overlap the row dividers.
-		t.priority === 'urgent' && 'bg-danger-400/5 ring-1 ring-danger-300/80 ring-inset'
+		t.priority === 'urgent' && 'bg-danger-400/5 ring-1 ring-danger-300/80 ring-inset',
+		selected && 'bg-primary-400/10 hover:bg-primary-400/15'
 	]}
 >
+	{#if selectable}
+		<span
+			aria-hidden="true"
+			class={[
+				'flex size-4 shrink-0 items-center justify-center rounded border transition',
+				selected ? 'border-primary-400 bg-primary-400 text-primary-950' : 'border-ink-600 group-hover:border-ink-400'
+			]}
+		>
+			{#if selected}<Icon name="check" class="size-3" />{/if}
+		</span>
+	{/if}
 	<span title="{priorityLabel(t.priority)} priority" class="shrink-0 text-ink-400">
 		<PriorityIcon priority={t.priority} class="size-4" />
 		<span class="sr-only">{priorityLabel(t.priority)} priority</span>
@@ -50,4 +82,4 @@
 			<span class="sr-only">Unassigned</span>
 		</span>
 	{/if}
-</a>
+</svelte:element>

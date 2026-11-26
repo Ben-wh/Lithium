@@ -326,6 +326,15 @@ export const tickets = {
 	/** Staff only. Only the fields given change; null clears category/assignee. */
 	update: (id: number, changes: TicketChanges) =>
 		request<Ticket>(`/api/tickets/${id}`, { method: 'PATCH', body: JSON.stringify(changes) }),
+	/**
+	 * Staff only: one change for up to 100 tickets. Tickets that can't take it
+	 * (e.g. outside the assignee's groups) are skipped with a reason.
+	 */
+	bulk: (ids: number[], changes: TicketChanges) =>
+		request<{ updated: number; skipped: { id: number; reason: string }[] }>('/api/tickets/bulk', {
+			method: 'POST',
+			body: JSON.stringify({ ids, ...changes })
+		}),
 	/** Moves a resolved or closed ticket back into the queue. The requester or staff. */
 	reopen: (id: number) => request<Ticket>(`/api/tickets/${id}/reopen`, { method: 'POST', body: '{}' }),
 	comments: (id: number | string, f?: Fetch) => request<Comment[]>(`/api/tickets/${id}/comments`, {}, f),

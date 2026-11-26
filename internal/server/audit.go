@@ -63,6 +63,7 @@ var auditRoutes = map[string]auditRoute{
 
 	"POST /api/tickets":                    {action: "ticket.create", category: catTickets, summary: "Raised a ticket", target: "ticket", create: true, fields: []string{"priority", "categoryId"}},
 	"PATCH /api/tickets/{id}":              {action: "ticket.update", category: catTickets, summary: "Updated a ticket", target: "ticket", fields: []string{"status", "priority", "categoryId", "assigneeId"}},
+	"POST /api/tickets/bulk":               {action: "ticket.bulk_update", category: catTickets, summary: "Updated tickets in bulk", fields: []string{"ids", "status", "priority", "categoryId", "assigneeId"}},
 	"POST /api/tickets/{id}/reopen":        {action: "ticket.reopen", category: catTickets, summary: "Reopened a ticket", target: "ticket"},
 	"PUT /api/tickets/{id}/parent":         {action: "ticket.link", category: catTickets, summary: "Linked a ticket", target: "ticket", fields: []string{"parentId"}},
 	"POST /api/tickets/{id}/comments":      {action: "ticket.comment", category: catTickets, summary: "Commented on a ticket", target: "ticket", fields: []string{"internal"}},
