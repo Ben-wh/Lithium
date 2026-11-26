@@ -1,5 +1,5 @@
-import { listCategories, tickets, type Priority, type TicketQuery } from '$lib/api';
-import { TICKET_PAGE_SIZE, ticketViews, type TicketView } from '$lib/tickets';
+import { listCategories, tickets, type Priority, type TicketQuery, type TicketSort } from '$lib/api';
+import { TICKET_PAGE_SIZE, ticketSorts, ticketViews, type TicketSortChoice, type TicketView } from '$lib/tickets';
 import type { PageLoad } from './$types';
 
 const priorities = new Set(['low', 'normal', 'high', 'urgent']);
@@ -18,8 +18,19 @@ export const load: PageLoad = async ({ url, fetch }) => {
 	const categoryParam = Number(p.get('category'));
 	const category: number | '' = Number.isInteger(categoryParam) && categoryParam > 0 ? categoryParam : '';
 	const q = p.get('q')?.trim() ?? '';
+	const sort = pick<TicketSortChoice>('sort', new Set(ticketSorts.map((s) => s.value)), ticketSorts[0].value);
+	const [sortKey, order] = sort.split('-') as [TicketSort, 'asc' | 'desc'];
 
-	const query: TicketQuery = { status: ticketViews[view].status, priority, assignee, category, q, limit: TICKET_PAGE_SIZE };
+	const query: TicketQuery = {
+		status: ticketViews[view].status,
+		priority,
+		assignee,
+		category,
+		q,
+		sort: sortKey,
+		order,
+		limit: TICKET_PAGE_SIZE
+	};
 	const [list, categories] = await Promise.all([tickets.list(query, fetch), listCategories(fetch)]);
-	return { list, categories, query, filters: { view, priority, assignee, category, q } };
+	return { list, categories, query, filters: { view, priority, assignee, category, q, sort } };
 };

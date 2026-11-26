@@ -289,9 +289,14 @@ export type TicketQuery = {
 	/** Staff only: one requester's tickets. */
 	requester?: number;
 	q?: string;
+	sort?: TicketSort;
+	order?: 'asc' | 'desc';
 	limit?: number;
 	offset?: number;
 };
+
+/** What the ticket list can be sorted by. The default is updated, newest first. */
+export type TicketSort = 'updated' | 'created' | 'priority' | 'status' | 'subject' | 'assignee';
 
 export type TicketStats = {
 	unassigned: number;

@@ -211,8 +211,41 @@ type TicketFilter struct {
 	ScopeUserID     int64
 	ScopeCategories []int64
 	Query           string // matches subject, requester, or a ticket reference ("TID-123", "#123", "123")
+	Sort            string // a key of ticketSorts; "" = updated
+	Descending      bool   // only used with Sort; the default (updated) is newest first
 	Limit           int
 	Offset          int
+}
+
+// ticketSorts maps a sort key to its ORDER BY expression, in ascending order.
+// Ties are broken by most recently updated.
+var ticketSorts = map[string]string{
+	"updated": "t.updated_at",
+	"created": "t.created_at",
+	// Ascending is least urgent first; descending puts urgent at the top.
+	"priority": "CASE t.priority WHEN 'low' THEN 0 WHEN 'normal' THEN 1 WHEN 'high' THEN 2 ELSE 3 END",
+	// The order tickets move through.
+	"status": "CASE t.status WHEN 'unassigned' THEN 0 WHEN 'in_progress' THEN 1 WHEN 'pending' THEN 2 " +
+		"WHEN 'resolved' THEN 3 WHEN 'closed' THEN 4 ELSE 5 END",
+	"subject": "t.subject COLLATE NOCASE",
+	// Unassigned tickets go last either way.
+	"assignee": "a.name IS NULL, a.name COLLATE NOCASE",
+}
+
+// ValidTicketSort reports whether key can be used as TicketFilter.Sort.
+func ValidTicketSort(key string) bool { _, ok := ticketSorts[key]; return ok }
+
+func (f TicketFilter) orderBy() string {
+	expr, ok := ticketSorts[f.Sort]
+	if !ok {
+		return "ORDER BY t.updated_at DESC, t.id DESC"
+	}
+	dir := " ASC"
+	if f.Descending {
+		dir = " DESC"
+	}
+	// The direction applies to the last term, so "assignee" keeps unassigned last.
+	return "ORDER BY " + expr + dir + ", t.updated_at DESC, t.id DESC"
 }
 
 func (f TicketFilter) where() (string, []any) {
@@ -292,7 +325,7 @@ func (s *Store) ListTickets(ctx context.Context, f TicketFilter) ([]TicketSummar
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT t.id, t.subject, t.status, t.priority, t.created_at, t.updated_at,
 		       r.id, r.name, r.email, r.avatar, a.id, a.name, a.email, a.avatar, cat.id, cat.name, cat.color `+from+where+`
-		ORDER BY t.updated_at DESC, t.id DESC
+		`+f.orderBy()+`
 		LIMIT ? OFFSET ?`, append(args, f.Limit, f.Offset)...)
 	if err != nil {
 		return nil, 0, err

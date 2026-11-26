@@ -257,7 +257,8 @@ type ticketList struct {
 // sees tickets they requested.
 //
 // Query params: status (comma-separated), priority, assignee (me|unassigned),
-// q (search), limit (1-100, default 50), offset.
+// q (search), sort (updated|created|priority|status|subject|assignee, default
+// updated), order (asc|desc, default desc), limit (1-100, default 50), offset.
 func (s *Server) handleListTickets(w http.ResponseWriter, r *http.Request) {
 	user := userFrom(r.Context())
 	qs := r.URL.Query()
@@ -304,6 +305,21 @@ func (s *Server) handleListTickets(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		f.CategoryID = id
+	}
+	if v := qs.Get("sort"); v != "" {
+		if !store.ValidTicketSort(v) {
+			writeError(w, http.StatusBadRequest, "unknown sort "+strconv.Quote(v))
+			return
+		}
+		f.Sort = v
+	}
+	switch qs.Get("order") {
+	case "", "desc":
+		f.Descending = true
+	case "asc":
+	default:
+		writeError(w, http.StatusBadRequest, "order must be asc or desc")
+		return
 	}
 	if v := qs.Get("limit"); v != "" {
 		n, err := strconv.Atoi(v)

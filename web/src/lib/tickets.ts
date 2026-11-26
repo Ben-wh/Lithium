@@ -1,4 +1,4 @@
-import type { Priority, TicketStatus } from './api';
+import type { Priority, TicketSort, TicketStatus } from './api';
 
 export const priorities: { value: Priority; label: string; hint: string }[] = [
 	{ value: 'low', label: 'Low', hint: 'Minor, no rush' },
@@ -60,6 +60,24 @@ export const ticketViews = {
 export type TicketView = keyof typeof ticketViews;
 
 export const TICKET_PAGE_SIZE = 50;
+
+/**
+ * Sort choices on the tickets list, as "key-order" (the value kept in the
+ * URL). The first is the default.
+ */
+export const ticketSorts = [
+	{ value: 'updated-desc', label: 'Recently updated' },
+	{ value: 'updated-asc', label: 'Least recently updated' },
+	{ value: 'created-desc', label: 'Newest first' },
+	{ value: 'created-asc', label: 'Oldest first' },
+	{ value: 'priority-desc', label: 'Priority: highest first' },
+	{ value: 'priority-asc', label: 'Priority: lowest first' },
+	{ value: 'status-asc', label: 'Status' },
+	{ value: 'subject-asc', label: 'Subject: A to Z' },
+	{ value: 'subject-desc', label: 'Subject: Z to A' },
+	{ value: 'assignee-asc', label: 'Assignee: A to Z', staffOnly: true }
+] as const satisfies readonly { value: `${TicketSort}-${'asc' | 'desc'}`; label: string; staffOnly?: boolean }[];
+export type TicketSortChoice = (typeof ticketSorts)[number]['value'];
 
 /** One-line explanations shown in the status picker. */
 export const statusHints: Record<TicketStatus, string> = {

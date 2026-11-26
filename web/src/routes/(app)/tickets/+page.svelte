@@ -7,7 +7,7 @@
 	import Icon from '$lib/components/Icon.svelte';
 	import PriorityIcon from '$lib/components/PriorityIcon.svelte';
 	import TicketRow from '$lib/components/TicketRow.svelte';
-	import { priorities, TICKET_PAGE_SIZE, ticketViews as views, type TicketView as View } from '$lib/tickets';
+	import { priorities, TICKET_PAGE_SIZE, ticketSorts, ticketViews as views, type TicketView as View } from '$lib/tickets';
 
 	let { data } = $props();
 
@@ -73,6 +73,9 @@
 		{ value: 'me', label: 'Assigned to me' },
 		{ value: 'unassigned', label: 'Unassigned' }
 	];
+	// Sorting isn't a filter: "Clear filters" leaves it alone.
+	const sortOptions = $derived(ticketSorts.filter((s) => isStaff || !('staffOnly' in s)));
+
 	const categoryById = $derived(new Map(data.categories.map((c) => [c.id, c])));
 	const categoryOptions = $derived<DropdownOption<number | ''>[]>([
 		{ value: '', label: 'Any category' },
@@ -217,6 +220,24 @@
 				Clear filters
 			</button>
 		{/if}
+
+		<div class="w-56 sm:ml-auto">
+			{#key f.sort}
+				<Dropdown
+					id="sort"
+					size="sm"
+					label="Sort"
+					value={f.sort}
+					options={sortOptions}
+					onchange={(v) => setParams({ sort: v === ticketSorts[0].value ? '' : v })}
+				>
+					{#snippet item(opt)}
+						<Icon name="sort" class="size-4 shrink-0 text-ink-500" />
+						<span class="truncate text-[13px] text-ink-100">{opt.label}</span>
+					{/snippet}
+				</Dropdown>
+			{/key}
+		</div>
 	</div>
 
 	<!-- List -->
