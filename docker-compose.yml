@@ -1,6 +1,11 @@
 services:
   lithium:
-    build: .
+    build:
+      context: .
+      args:
+        # The git commit being built, so Settings → Updates can tell what's new.
+        # install.sh sets it; by hand: LITHIUM_COMMIT=$(git rev-parse HEAD) docker compose up -d --build
+        LITHIUM_COMMIT: ${LITHIUM_COMMIT:-}
     image: lithium:latest
     restart: unless-stopped
     ports:

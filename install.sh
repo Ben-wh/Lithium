@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # Lithium first-time setup: asks for the admin account and email settings,
 # writes them to .env, then (optionally) builds and starts the container.
+#
+#   ./install.sh          set up, or choose what to do with an existing install
+#   ./install.sh update   pull the latest version from GitHub, rebuild and restart
 set -euo pipefail
 
 cd "$(dirname "$0")"
@@ -125,6 +128,9 @@ env_get() {
 started=0
 start_lithium() {
 	section "Building and starting"
+	# Baked into the image so Settings → Updates knows which version is running.
+	LITHIUM_COMMIT=$(git rev-parse HEAD 2>/dev/null || true)
+	export LITHIUM_COMMIT
 	if [[ "${1-}" == --pull ]]; then
 		"${DOCKER[@]}" compose build --pull
 		"${DOCKER[@]}" compose up -d
@@ -145,6 +151,54 @@ start_lithium() {
 	else
 		warn "It hasn't reported healthy yet. Check: ${DOCKER[*]} compose logs -f lithium"
 	fi
+}
+
+# update_lithium → pulls the latest commits from GitHub (fast-forward only, so
+# local changes are never overwritten), then rebuilds and restarts.
+update_lithium() {
+	(( HAVE_DOCKER )) || die "Docker isn't usable (see above), so Lithium can't be rebuilt."
+	git rev-parse --is-inside-work-tree >/dev/null 2>&1 \
+		|| die "This folder isn't a git clone, so it can't pull updates. Clone it with: git clone https://github.com/Ben-wh/Lithium.git"
+	git rev-parse --abbrev-ref '@{upstream}' >/dev/null 2>&1 \
+		|| die "The current branch doesn't track a GitHub branch. Try: git checkout main"
+
+	section "Checking GitHub for updates"
+	git fetch --quiet || die "Couldn't fetch from GitHub. Check the server's internet connection."
+	local behind ahead
+	behind=$(git rev-list --count 'HEAD..@{upstream}')
+	ahead=$(git rev-list --count '@{upstream}..HEAD')
+
+	if (( behind == 0 )); then
+		ok "Already up to date ($(git rev-parse --short HEAD))."
+		ask_yn "Rebuild and restart anyway?" n || { echo; exit 0; }
+	else
+		info "$behind new commit(s):"
+		git log --format='    %h  %s' 'HEAD..@{upstream}' | head -n 20
+		(( behind > 20 )) && info "    ...and $((behind - 20)) more"
+		echo
+		if (( ahead > 0 )); then
+			die "This copy has $ahead local commit(s) that aren't on GitHub, so it can't update automatically. Merge by hand with: git pull"
+		fi
+		if ! git diff --quiet HEAD -- 2>/dev/null; then
+			warn "Some tracked files have been changed here:"
+			git status --short --untracked-files=no | sed 's/^/    /'
+			die "Commit or undo those changes (git stash), then run ./install.sh update again."
+		fi
+		ask_yn "Update to $(git rev-parse --short '@{upstream}') and restart Lithium?" y || { info "Nothing changed."; exit 0; }
+		# git replaces files rather than editing them in place, so this running
+		# script carries on safely even if the update changes it.
+		git merge --ff-only --quiet '@{upstream}' || die "git couldn't apply the update. Try: git pull"
+		ok "Updated to $(git rev-parse --short HEAD)."
+	fi
+
+	start_lithium
+	section "Done"
+	if (( started )); then
+		printf '  Open %s%s%s\n' "$BOLD" "$(env_get LITHIUM_BASE_URL)" "$RESET"
+	fi
+	info "Database changes run automatically on start. Logs: ${DOCKER[*]} compose logs -f lithium"
+	echo
+	exit 0
 }
 
 # ── Preflight ──────────────────────────────────────────────────────────────
@@ -169,23 +223,34 @@ else
 	warn "Docker is installed but the daemon isn't running. Try: sudo systemctl start docker"
 fi
 
+case "${1-}" in
+	"") ;;
+	update)
+		[[ -f "$ENV_FILE" ]] || die "No $ENV_FILE yet. Run ./install.sh first to set Lithium up."
+		update_lithium
+		;;
+	*) die "Unknown option: $1  (usage: ./install.sh [update])" ;;
+esac
+
 if [[ -f "$ENV_FILE" ]]; then
 	section "Existing install"
 	info "Found $ENV_FILE (admin: $(env_get LITHIUM_ADMIN_EMAIL), URL: $(env_get LITHIUM_BASE_URL))"
 	echo
-	info "  1) Rebuild and restart with these settings  (data is kept)"
-	info "  2) Reconfigure: answer the questions again and write a new $ENV_FILE"
-	info "  3) Quit"
+	info "  1) Update from GitHub, then rebuild and restart  (data is kept)"
+	info "  2) Rebuild and restart with these settings  (data is kept)"
+	info "  3) Reconfigure: answer the questions again and write a new $ENV_FILE"
+	info "  4) Quit"
 	while true; do
-		ask choice "Choose 1-3" "1"
+		ask choice "Choose 1-4" "1"
 		case "$choice" in
-			1|2|3) break ;;
-			*) err "Enter 1, 2 or 3." ;;
+			1|2|3|4) break ;;
+			*) err "Enter 1, 2, 3 or 4." ;;
 		esac
 	done
 
 	case "$choice" in
-		1)
+		1) update_lithium ;;
+		2)
 			(( HAVE_DOCKER )) || die "Docker isn't usable (see above), so Lithium can't be rebuilt."
 			pull=""
 			ask_yn "Also pull the latest base images (Go, Node, etc.)?" n && pull=--pull
@@ -198,7 +263,7 @@ if [[ -f "$ENV_FILE" ]]; then
 			echo
 			exit 0
 			;;
-		3) info "Nothing changed."; exit 0 ;;
+		4) info "Nothing changed."; exit 0 ;;
 	esac
 
 	info "The admin account is only created on the very first start. If Lithium has"

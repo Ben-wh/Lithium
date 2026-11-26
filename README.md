@@ -90,7 +90,7 @@ The installer asks for:
 
 It then writes `.env` (readable only by you), builds the image, starts the container and waits for the health check.
 
-Run `./install.sh` again later to **rebuild and restart** with your existing settings (your data is kept), or to reconfigure.
+Run `./install.sh` again later to **update from GitHub**, **rebuild and restart** with your existing settings (your data is kept), or to reconfigure.
 
 ### Option 2: by hand
 
@@ -173,13 +173,22 @@ Email is off unless `LITHIUM_SMTP_HOST` is set. If you leave these blank, an adm
 
 ### Updating
 
+Admins can see whether a newer version is on GitHub under **Settings → Updates**. To install it, run this in the Lithium folder on the server:
+
 ```sh
-git pull
-./install.sh        # choose 1) Rebuild and restart
-# or: docker compose up -d --build
+./install.sh update
 ```
 
-Database migrations run automatically on start.
+It shows what's new, pulls it from GitHub (fast-forward only, so local changes are never overwritten), then rebuilds and restarts. Your data is kept and database migrations run automatically on start.
+
+To do it by hand instead:
+
+```sh
+git pull
+LITHIUM_COMMIT=$(git rev-parse HEAD) docker compose up -d --build
+```
+
+`LITHIUM_COMMIT` tells Lithium which version it's running. Without it, Settings → Updates can't compare versions.
 
 ### Backups
 

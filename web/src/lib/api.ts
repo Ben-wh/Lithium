@@ -733,3 +733,30 @@ export const lockdown = {
 		}),
 	end: () => request<Lockdown>('/api/admin/lockdown/end', { method: 'POST', body: '{}' })
 };
+
+// --- Updates (admins) ---
+
+export type UpdateCommit = { sha: string; message: string; date: string; url: string };
+
+export type UpdateStatus = {
+	/**
+	 * current: up to date. behind: updates available. unknown: this build's
+	 * version wasn't recorded. unrecognised: GitHub doesn't know this build's
+	 * commit. error: GitHub couldn't be reached.
+	 */
+	status: 'current' | 'behind' | 'unknown' | 'unrecognised' | 'error';
+	current: string;
+	latest?: UpdateCommit;
+	behind: number;
+	/** Newest first, at most 20. */
+	commits: UpdateCommit[];
+	error?: string;
+	checkedAt: string;
+	repoUrl: string;
+	branch: string;
+};
+
+export const updates = {
+	/** refresh asks GitHub again instead of using the last answer. */
+	check: (refresh = false) => request<UpdateStatus>(`/api/admin/updates${refresh ? '?refresh=1' : ''}`)
+};

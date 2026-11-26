@@ -23,6 +23,7 @@ type Server struct {
 	throttle     *accountThrottle // wrong passwords and codes, per account
 	dummyHash    string           // compared against when a login email doesn't exist, to keep timing uniform
 	mailer       mail.Sender      // tests only: replaces the SMTP sender (see senderFor)
+	updates      *updateChecker
 }
 
 func New(cfg config.Config, st *store.Store, log *slog.Logger) (*Server, error) {
@@ -39,6 +40,7 @@ func New(cfg config.Config, st *store.Store, log *slog.Logger) (*Server, error) 
 		mfaLimiter:   newIPLimiter(),
 		throttle:     newAccountThrottle(),
 		dummyHash:    dummy,
+		updates:      newUpdateChecker(),
 	}, nil
 }
 
@@ -144,6 +146,7 @@ func (s *Server) Handler(frontend fs.FS) http.Handler {
 	admin("POST /api/admin/groups", s.handleCreateGroup)
 	admin("PUT /api/admin/groups/{id}", s.handleUpdateGroup)
 	admin("DELETE /api/admin/groups/{id}", s.handleDeleteGroup)
+	admin("GET /api/admin/updates", s.handleCheckUpdates)
 
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "not found")

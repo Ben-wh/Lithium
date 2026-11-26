@@ -13,7 +13,11 @@ COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
 COPY --from=web /src/web/build ./web/build
-RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/lithium ./cmd/lithium \
+# The git commit being built, shown in Settings → Updates (install.sh sets it).
+ARG LITHIUM_COMMIT=""
+RUN CGO_ENABLED=0 go build -trimpath \
+      -ldflags="-s -w -X github.com/lithium/lithium/internal/version.commit=${LITHIUM_COMMIT}" \
+      -o /out/lithium ./cmd/lithium \
  && mkdir -p /out/data
 
 # --- Runtime ---
