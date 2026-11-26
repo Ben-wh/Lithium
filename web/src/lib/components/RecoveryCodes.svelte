@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Icon from './Icon.svelte';
+	import { copyText } from '$lib/clipboard';
 
 	// Shows freshly generated recovery codes (they're never shown again) with
 	// copy and download, and makes the user confirm they've saved them.
@@ -15,12 +16,10 @@
 	);
 
 	async function copy() {
-		try {
-			await navigator.clipboard.writeText(codes.join('\n'));
+		// If copying is blocked, they can still download.
+		if (await copyText(codes.join('\n'))) {
 			copied = true;
 			setTimeout(() => (copied = false), 2000);
-		} catch {
-			/* clipboard blocked; they can still download */
 		}
 	}
 

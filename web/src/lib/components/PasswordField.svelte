@@ -7,6 +7,7 @@
 
 <script lang="ts">
 	import Icon from './Icon.svelte';
+	import { copyText } from '$lib/clipboard';
 
 	let {
 		value = $bindable(''),
@@ -47,12 +48,9 @@
 	}
 
 	async function copy() {
-		try {
-			await navigator.clipboard.writeText(value);
+		if (await copyText(value)) {
 			copied = true;
 			setTimeout(() => (copied = false), 1500);
-		} catch {
-			/* clipboard unavailable (e.g. plain http on a remote host) */
 		}
 	}
 

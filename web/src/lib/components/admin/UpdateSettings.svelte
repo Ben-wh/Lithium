@@ -3,11 +3,14 @@
 	import { updates, type UpdateStatus } from '$lib/api';
 	import { dateTimeFmt, timeAgo } from '$lib/format';
 	import Icon from '$lib/components/Icon.svelte';
+	import { copyText } from '$lib/clipboard';
 
 	let st = $state<UpdateStatus | null>(null);
 	let checking = $state(false);
 	let loadFailed = $state(false);
 	let copied = $state(false);
+	let copyFailed = $state(false);
+	let commandEl: HTMLElement | undefined = $state();
 
 	const COMMAND = './install.sh update';
 
@@ -26,13 +29,15 @@
 	onMount(() => check(false));
 
 	async function copy() {
-		try {
-			await navigator.clipboard.writeText(COMMAND);
+		if (await copyText(COMMAND)) {
 			copied = true;
+			copyFailed = false;
 			setTimeout(() => (copied = false), 2000);
-		} catch {
-			/* clipboard blocked; the command is on screen */
+			return;
 		}
+		// Copying is blocked: select the command so Ctrl/⌘+C works.
+		copyFailed = true;
+		if (commandEl) window.getSelection()?.selectAllChildren(commandEl);
 	}
 
 	const short = (sha: string) => sha.slice(0, 7);
@@ -129,12 +134,15 @@
 				unavailable for about a minute while it restarts.
 			</p>
 			<div class="flex items-center gap-2 rounded-lg border border-ink-800 bg-ink-950/60 py-1.5 pr-1.5 pl-3">
-				<code class="min-w-0 flex-1 truncate font-mono text-[13px] text-ink-100">{COMMAND}</code>
+				<code bind:this={commandEl} class="min-w-0 flex-1 truncate font-mono text-[13px] text-ink-100 select-all">{COMMAND}</code>
 				<button type="button" onclick={copy} class="inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-xs text-ink-400 transition hover:bg-ink-850 hover:text-ink-100">
 					<Icon name={copied ? 'check' : 'copy'} class="size-3.5" />
 					{copied ? 'Copied' : 'Copy'}
 				</button>
 			</div>
+			{#if copyFailed}
+				<p role="alert" class="text-xs text-danger-300">Your browser blocked copying. The command is selected: press Ctrl+C (⌘C on a Mac).</p>
+			{/if}
 			<p class="text-xs text-ink-500">
 				Lithium can't update itself from here: for safety, the app has no access to the server or to Docker.
 				Checked {timeAgo(st.checkedAt)} against
