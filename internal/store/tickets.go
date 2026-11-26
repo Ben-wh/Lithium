@@ -51,6 +51,9 @@ type Ticket struct {
 	TemplateName string        `json:"templateName"`
 	CreatedAt    time.Time     `json:"createdAt"`
 	UpdatedAt    time.Time     `json:"updatedAt"`
+	// Clock runs the ticket's SLA; SLA is filled in for staff by the server.
+	Clock SLAClock   `json:"-"`
+	SLA   *SLAStatus `json:"sla,omitempty"`
 }
 
 type NewTicket struct {
@@ -128,13 +131,15 @@ func (s *Store) TicketByID(ctx context.Context, id int64) (Ticket, error) {
 	dest = append(dest, by.dest()...)
 	dest = append(dest, asg.dest()...)
 	var fields string
+	var clock slaClockScan
 	dest = append(dest, &catID, &catName, &catColor, &fields, &t.TemplateName)
+	dest = append(dest, clock.dest()...)
 	err := s.db.QueryRowContext(ctx, `
 		SELECT t.id, t.subject, t.description, t.status, t.priority, t.created_at, t.updated_at,
 		       r.id, r.name, r.email, r.avatar,
 		       c.id, c.name, c.email, c.avatar,
 		       a.id, a.name, a.email, a.avatar,
-		       cat.id, cat.name, cat.color, t.custom_fields, t.template_name
+		       cat.id, cat.name, cat.color, t.custom_fields, t.template_name, `+slaClockCols+`
 		FROM tickets t
 		JOIN users r ON r.id = t.requester_id
 		JOIN users c ON c.id = t.created_by
@@ -151,6 +156,7 @@ func (s *Store) TicketByID(ctx context.Context, id int64) (Ticket, error) {
 	}
 	t.CreatedAt = time.Unix(created, 0).UTC()
 	t.UpdatedAt = time.Unix(updated, 0).UTC()
+	t.Clock = clock.clock(t.CreatedAt)
 	t.Requester, t.CreatedBy, t.Assignee = *req.ref(), *by.ref(), asg.ref()
 	t.Category = categoryRef(catID, catName, catColor)
 	if t.Attachments, err = s.AttachmentsForTicket(ctx, t.ID); err != nil {
@@ -196,6 +202,8 @@ type TicketSummary struct {
 	Category  *CategoryRef `json:"category"`
 	CreatedAt time.Time    `json:"createdAt"`
 	UpdatedAt time.Time    `json:"updatedAt"`
+	Clock     SLAClock     `json:"-"`
+	SLA       *SLAStatus   `json:"sla,omitempty"` // staff only, filled in by the server
 }
 
 type TicketFilter struct {
@@ -324,7 +332,7 @@ func (s *Store) ListTickets(ctx context.Context, f TicketFilter) ([]TicketSummar
 
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT t.id, t.subject, t.status, t.priority, t.created_at, t.updated_at,
-		       r.id, r.name, r.email, r.avatar, a.id, a.name, a.email, a.avatar, cat.id, cat.name, cat.color `+from+where+`
+		       r.id, r.name, r.email, r.avatar, a.id, a.name, a.email, a.avatar, cat.id, cat.name, cat.color, `+slaClockCols+` `+from+where+`
 		`+f.orderBy()+`
 		LIMIT ? OFFSET ?`, append(args, f.Limit, f.Offset)...)
 	if err != nil {
@@ -342,12 +350,15 @@ func (s *Store) ListTickets(ctx context.Context, f TicketFilter) ([]TicketSummar
 		dest := []any{&t.ID, &t.Subject, &t.Status, &t.Priority, &created, &updated}
 		dest = append(dest, req.dest()...)
 		dest = append(dest, asg.dest()...)
+		var clock slaClockScan
 		dest = append(dest, &catID, &catName, &catColor)
+		dest = append(dest, clock.dest()...)
 		if err := rows.Scan(dest...); err != nil {
 			return nil, 0, err
 		}
 		t.CreatedAt = time.Unix(created, 0).UTC()
 		t.UpdatedAt = time.Unix(updated, 0).UTC()
+		t.Clock = clock.clock(t.CreatedAt)
 		t.Requester, t.Assignee = *req.ref(), asg.ref()
 		t.Category = categoryRef(catID, catName, catColor)
 		out = append(out, t)

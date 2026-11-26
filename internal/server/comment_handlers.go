@@ -229,6 +229,7 @@ func (s *Server) handleUpdateTicket(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
+	s.withSLA(r.Context(), userFrom(r.Context()), &t)
 	writeJSON(w, http.StatusOK, t)
 }
 
@@ -369,5 +370,6 @@ func (s *Server) handleReopenTicket(w http.ResponseWriter, r *http.Request) {
 	}
 	s.log.Info("ticket reopened", "ticket_id", t.ID, "by", actor.ID)
 	s.notifyUpdate(r.Context(), t, actor, changes)
+	s.withSLA(r.Context(), actor, &t)
 	writeJSON(w, http.StatusOK, t)
 }

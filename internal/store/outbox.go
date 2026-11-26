@@ -20,7 +20,7 @@ const (
 	EmailReplies  = "replies"  // replies, and internal notes for staff
 	EmailMentions = "mentions" // @mentions of them or their groups
 	EmailAssigned = "assigned" // a ticket being assigned to them
-	EmailUpdates  = "updates"  // status, priority, category and other changes
+	EmailUpdates  = "updates"  // status, priority, category and other changes, and SLA alerts for admins
 )
 
 // AllEmailEvents is every event kind, in display order (and the default).
@@ -30,6 +30,7 @@ var AllEmailEvents = []string{EmailReplies, EmailMentions, EmailAssigned, EmailU
 var emailEventFor = map[string]string{
 	"reply": EmailReplies, "note": EmailReplies, "mention": EmailMentions,
 	"assigned": EmailAssigned, "update": EmailUpdates,
+	"sla": EmailUpdates, // SLA alerts (admins) come with updates
 }
 
 // EmailEvents is a set of event kinds, stored comma-separated.

@@ -10,6 +10,7 @@
 	import StatusBadge from '$lib/components/StatusBadge.svelte';
 	import TicketTimeline from '$lib/components/TicketTimeline.svelte';
 	import LinkedTickets from '$lib/components/LinkedTickets.svelte';
+	import SLAPanel from '$lib/components/SLAPanel.svelte';
 	import MentionTextarea, { type MentionCandidate } from '$lib/components/MentionTextarea.svelte';
 	import { encodeMentions } from '$lib/mentions';
 	import { notifications } from '$lib/notifications.svelte';
@@ -151,6 +152,10 @@
 			comments = [...comments, c];
 			reply = '';
 			mentioned = new Map();
+			// A public staff reply can be the first response: refresh the SLA.
+			if (!c.internal && t.sla?.firstResponse && t.sla.firstResponse.state !== 'met' && t.sla.firstResponse.state !== 'missed') {
+				t = await tickets.get(t.id);
+			}
 		} catch (err) {
 			replyError = errorText(err);
 		} finally {
@@ -468,6 +473,13 @@
 							/>
 						{/key}
 					</div>
+
+					{#if t.sla}
+						<section aria-label="SLA" class="rounded-lg border border-danger-400/60 bg-danger-400/5 p-3.5">
+							<p class="mb-2.5 text-xs font-medium text-danger-200">SLA</p>
+							{#key t.sla}<SLAPanel sla={t.sla} ownTicket={t.requester.id === me} />{/key}
+						</section>
+					{/if}
 
 					{#if links}
 						<div class="border-t border-ink-800 pt-4">

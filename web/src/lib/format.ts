@@ -18,3 +18,14 @@ export function formatBytes(n: number) {
 	if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`;
 	return `${(n / (1024 * 1024)).toFixed(1).replace(/\.0$/, '')} MB`;
 }
+
+/** A length of time in minutes, briefly: 45 → "45m", 240 → "4h", 1500 → "1d 1h". */
+export function formatMinutes(total: number) {
+	const m = Math.max(1, Math.round(total));
+	const days = Math.floor(m / 1440);
+	const hours = Math.floor((m % 1440) / 60);
+	const mins = m % 60;
+	if (days > 0) return hours > 0 ? `${days}d ${hours}h` : `${days}d`;
+	if (hours > 0) return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+	return `${mins}m`;
+}

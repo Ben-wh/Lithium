@@ -92,6 +92,17 @@ func (s *Store) AddComment(ctx context.Context, ticketID, authorID int64, body s
 		if _, err := tx.ExecContext(ctx, `UPDATE tickets SET updated_at = ? WHERE id = ?`, now, ticketID); err != nil {
 			return Comment{}, err
 		}
+		// The first public reply from staff (other than the requester) is the
+		// first response, measured on the SLA clock.
+		if _, err := tx.ExecContext(ctx, `
+			UPDATE tickets
+			SET first_response_seconds = MAX(0, ? - created_at - sla_paused_seconds
+			                                    - CASE WHEN sla_paused_since IS NULL THEN 0 ELSE ? - sla_paused_since END)
+			WHERE id = ? AND first_response_seconds IS NULL AND requester_id != ?
+			  AND EXISTS (SELECT 1 FROM users WHERE id = ? AND role IN ('admin', 'agent'))`,
+			now, now, ticketID, authorID, authorID); err != nil {
+			return Comment{}, err
+		}
 	}
 	if err := tx.Commit(); err != nil {
 		return Comment{}, err
@@ -197,6 +208,26 @@ func (s *Store) UpdateTicket(ctx context.Context, id, actorID int64, u TicketUpd
 		UPDATE tickets SET status = ?, priority = ?, category_id = ?, assignee_id = ?, updated_at = ? WHERE id = ?`,
 		newStatus, newPriority, nullID(newCat), nullID(newAsg), now, id); err != nil {
 		return nil, err
+	}
+	// The SLA clock stops while Pending or finished, and carries on after.
+	switch wasPaused, isPaused := slaPaused(status), slaPaused(newStatus); {
+	case !wasPaused && isPaused:
+		_, err = tx.ExecContext(ctx, `UPDATE tickets SET sla_paused_since = ? WHERE id = ?`, now, id)
+	case wasPaused && !isPaused:
+		_, err = tx.ExecContext(ctx, `
+			UPDATE tickets SET sla_paused_seconds = sla_paused_seconds + MAX(0, ? - COALESCE(sla_paused_since, ?)),
+			                   sla_paused_since = NULL
+			WHERE id = ?`, now, now, id)
+	}
+	if err != nil {
+		return nil, err
+	}
+	// A new priority or category can mean a different SLA rule, so its alerts
+	// are worked out afresh.
+	if newPriority != priority || newCat != catID.Int64 {
+		if _, err := tx.ExecContext(ctx, `UPDATE tickets SET sla_alerts = 0 WHERE id = ?`, id); err != nil {
+			return nil, err
+		}
 	}
 	for _, e := range events {
 		if _, err := tx.ExecContext(ctx, `

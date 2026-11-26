@@ -140,8 +140,13 @@
 									{/if}
 									<span class="min-w-0 flex-1">
 										<span class="block text-sm text-ink-200">
-											<span class="font-medium text-ink-100">{n.actor?.name ?? 'Someone'}</span>
-											{n.summary}
+											{#if n.kind === 'sla'}
+												<span class="font-medium text-ink-100">SLA:</span>
+												{n.summary}
+											{:else}
+												<span class="font-medium text-ink-100">{n.actor?.name ?? 'Someone'}</span>
+												{n.summary}
+											{/if}
 										</span>
 										<span class="mt-0.5 block truncate text-xs text-ink-500">
 											<span class="font-mono">{ticketRef(n.ticket.id, prefix)}</span> · {n.ticket.subject}

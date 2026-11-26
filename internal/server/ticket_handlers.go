@@ -228,6 +228,7 @@ func (s *Server) handleGetTicket(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "ticket not found")
 		return
 	}
+	s.withSLA(r.Context(), userFrom(r.Context()), &t)
 	writeJSON(w, http.StatusOK, t)
 }
 
@@ -351,6 +352,7 @@ func (s *Server) handleListTickets(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
+	s.withSLAs(r.Context(), user, tickets)
 	writeJSON(w, http.StatusOK, ticketList{Tickets: tickets, Total: total})
 }
 

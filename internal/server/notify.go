@@ -131,6 +131,10 @@ func (s *Server) notificationEmail(ctx context.Context, actorID int64, t store.T
 	ref := st.TicketPrefix + "-" + strconv.FormatInt(t.ID, 10)
 
 	e := store.EmailContent{Line: fmt.Sprintf("%s %s.", actor, summary)}
+	if actorID == 0 {
+		// From Lithium itself (e.g. an SLA alert): the summary is the sentence.
+		e.Line = summary + "."
+	}
 	var b strings.Builder
 	if st.SensitiveMode {
 		e.Subject = "[" + ref + "] New activity"

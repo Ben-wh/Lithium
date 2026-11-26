@@ -46,6 +46,10 @@ Open a ticket to work on it. The panel on the right lets you change:
 
 The requester and the assignee are notified of changes, and anyone newly assigned is told it's theirs.
 
+## SLAs
+
+If your admin has set SLA targets, a ticket's sidebar shows its **First response** and **Resolution** targets: how long is left, or whether they were met. The tickets list marks tickets that are **Due soon** or **Overdue**. The clock pauses while a ticket is **Pending**, and your first public reply (not an internal note) counts as the first response.
+
 ## Replies and internal notes
 
 The box under **Activity** has two modes:

@@ -253,7 +253,26 @@ export type Ticket = {
 	templateName?: string;
 	createdAt: string;
 	updatedAt: string;
+	/** Staff only, when an SLA rule applies. */
+	sla?: SLAStatus;
 };
+
+export type SLATarget = {
+	targetMinutes: number;
+	/**
+	 * running, paused (Pending), overdue (open and past the target), or for
+	 * a finished target met / missed.
+	 */
+	state: 'running' | 'paused' | 'overdue' | 'met' | 'missed';
+	/** Time counted so far (pauses excluded), as of when it was loaded. */
+	elapsedSeconds: number;
+	/** When a running target falls due. */
+	dueAt?: string;
+};
+export type SLAStatus = { ruleId: number; firstResponse?: SLATarget; resolution?: SLATarget };
+
+/** How far through a target the "due soon" warning starts (the server uses the same). */
+export const SLA_WARNING_SHARE = 0.75;
 
 export type Attachment = { id: number; filename: string; contentType: string; size: number; createdAt: string };
 export const attachmentUrl = (a: Pick<Attachment, 'id'>) => `/api/attachments/${a.id}`;
@@ -542,7 +561,8 @@ export const profile = {
 
 export type Notification = {
 	id: number;
-	kind: 'reply' | 'note' | 'mention' | 'update' | 'assigned';
+	/** sla: an SLA warning or breach, from Lithium itself (no actor). */
+	kind: 'reply' | 'note' | 'mention' | 'update' | 'assigned' | 'sla';
 	/** What the actor did, e.g. "changed the status to Resolved". */
 	summary: string;
 	actor: UserRef | null;
@@ -813,4 +833,31 @@ export const backups = {
 	create: () => request<void>('/api/admin/backups', { method: 'POST', body: '{}' }),
 	downloadUrl: (name: string) => `/api/admin/backups/${encodeURIComponent(name)}/download`,
 	delete: (name: string) => request<void>(`/api/admin/backups/${encodeURIComponent(name)}`, { method: 'DELETE' })
+};
+
+// --- SLA rules (admins) ---
+
+export type SLARule = {
+	id: number;
+	/** null = any category. */
+	category: CategoryRef | null;
+	/** "" = any priority. */
+	priority: Priority | '';
+	firstResponseMinutes: number | null;
+	resolutionMinutes: number | null;
+};
+
+export type SLARuleInput = {
+	categoryId: number | null;
+	priority: Priority | '';
+	firstResponseMinutes: number | null;
+	resolutionMinutes: number | null;
+};
+
+export const slaRules = {
+	list: () => request<SLARule[]>('/api/admin/sla-rules'),
+	create: (r: SLARuleInput) => request<SLARule>('/api/admin/sla-rules', { method: 'POST', body: JSON.stringify(r) }),
+	update: (id: number, r: SLARuleInput) =>
+		request<SLARule>(`/api/admin/sla-rules/${id}`, { method: 'PUT', body: JSON.stringify(r) }),
+	delete: (id: number) => request<void>(`/api/admin/sla-rules/${id}`, { method: 'DELETE' })
 };

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { TicketSummary } from '$lib/api';
+	import { SLA_WARNING_SHARE, type SLATarget, type TicketSummary } from '$lib/api';
 	import { timeAgo } from '$lib/format';
 	import { page } from '$app/state';
 	import { priorityLabel, ticketRef } from '$lib/tickets';
@@ -26,6 +26,16 @@
 	} = $props();
 	const prefix = $derived(page.data.settings?.ticketPrefix ?? 'TID');
 	const ref = $derived(ticketRef(t.id, prefix));
+
+	// Staff see an SLA chip when a target is overdue or close (as of loading).
+	const slaFlag = $derived.by(() => {
+		const targets = [t.sla?.firstResponse, t.sla?.resolution].filter((x): x is SLATarget => !!x);
+		if (targets.some((x) => x.state === 'overdue')) return 'overdue';
+		const soon = targets.some(
+			(x) => x.state === 'running' && x.elapsedSeconds / 60 >= x.targetMinutes * SLA_WARNING_SHARE
+		);
+		return soon ? 'soon' : null;
+	});
 </script>
 
 <svelte:element
@@ -70,6 +80,17 @@
 		</span>
 	</span>
 
+	{#if slaFlag}
+		<span
+			class={[
+				'tag-chip hidden shrink-0 rounded-md px-1.5 py-0.5 text-[11px] font-medium sm:inline-block',
+				slaFlag === 'overdue' ? 'tag-red' : 'tag-amber'
+			]}
+			title={slaFlag === 'overdue' ? 'An SLA target has been missed' : 'An SLA target is due soon'}
+		>
+			{slaFlag === 'overdue' ? 'Overdue' : 'Due soon'}
+		</span>
+	{/if}
 	<StatusBadge status={t.status} />
 
 	{#if t.assignee}

@@ -7,6 +7,7 @@
 	import Icon from '$lib/components/Icon.svelte';
 	import CategoryManager from './CategoryManager.svelte';
 	import TemplateManager from './TemplateManager.svelte';
+	import SLAManager from './SLAManager.svelte';
 
 	let settings = $state<Settings | null>(null);
 	let loadFailed = $state(false);
@@ -94,6 +95,7 @@
 
 <CategoryManager />
 <TemplateManager />
+<SLAManager />
 
 <div class="mt-6 rounded-xl border border-ink-800 bg-ink-900/60">
 	<div class="flex items-center justify-between gap-3 border-b border-ink-800 px-5 py-4">

@@ -44,6 +44,7 @@ Under **Settings → Tickets**:
 
 - **Categories**: add categories like "Hardware" or "Access request", each with a description and colour. Users pick one when they raise a ticket. **Archive** a category to hide it from new tickets; it can only be deleted while no tickets use it.
 - **Ticket templates**: ask for extra details on tickets in a category. A template can have instructions, a starting priority, and fields (short text, long text, number, dropdown, checkbox or date). Choose whether the description box is required, optional or hidden. Then link the template to categories.
+- **SLAs**: targets for the first reply and for resolving tickets, by category, priority or both (for example, urgent hardware tickets answered within 30 minutes and fixed within 4 hours). The most specific matching rule applies. The clock pauses while a ticket is Pending. Admins get a notification when 75% of the time has gone and again if the target is missed (and an email, if they get emails about updates).
 - **Mandatory category**: users must choose a category.
 - **Allow image uploads**: up to 5 images per ticket.
 - **Allow reporters to reopen their tickets**: people can reopen their own tickets once they're resolved, closed or raised in error. Agents and admins can always reopen tickets.
