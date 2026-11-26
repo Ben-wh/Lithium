@@ -74,6 +74,7 @@ func (s *Server) Handler(frontend fs.FS) http.Handler {
 	mux.Handle("GET /api/tickets/stats", s.requireUser(http.HandlerFunc(s.handleTicketStats)))
 	mux.Handle("GET /api/tickets/{id}", s.requireUser(http.HandlerFunc(s.handleGetTicket)))
 	mux.Handle("PATCH /api/tickets/{id}", s.requireStaff(http.HandlerFunc(s.handleUpdateTicket)))
+	mux.Handle("POST /api/tickets/{id}/reopen", s.requireUser(http.HandlerFunc(s.handleReopenTicket)))
 	mux.Handle("GET /api/tickets/{id}/links", s.requireStaff(http.HandlerFunc(s.handleTicketLinks)))
 	mux.Handle("GET /api/tickets/{id}/assignable", s.requireStaff(http.HandlerFunc(s.handleAssignable)))
 	mux.Handle("PUT /api/tickets/{id}/parent", s.requireStaff(http.HandlerFunc(s.handleSetParent)))

@@ -14,8 +14,25 @@ export const statusLabels: Record<TicketStatus, string> = {
 	in_progress: 'In progress',
 	pending: 'Pending',
 	resolved: 'Resolved',
-	closed: 'Closed'
+	closed: 'Closed',
+	raised_in_error: 'Raised in error'
 };
+
+/**
+ * Each status's colour, as a category tag class (see app.css) so it works in
+ * light and dark. The reports chart uses the same hues.
+ */
+export const statusTags: Record<TicketStatus, string> = {
+	unassigned: 'tag-blue',
+	in_progress: 'tag-orange',
+	pending: 'tag-amber',
+	resolved: 'tag-green',
+	closed: 'tag-gray',
+	raised_in_error: 'tag-red'
+};
+
+/** A finished ticket, which its requester or staff can reopen. */
+export const isDone = (s: TicketStatus) => s === 'resolved' || s === 'closed' || s === 'raised_in_error';
 
 export const initials = (name: string) =>
 	name
@@ -37,6 +54,7 @@ export const ticketViews = {
 	pending: { label: 'Pending', status: 'pending' },
 	resolved: { label: 'Resolved', status: 'resolved' },
 	closed: { label: 'Closed', status: 'closed' },
+	raised_in_error: { label: 'Raised in error', status: 'raised_in_error' },
 	all: { label: 'All', status: '' }
 } as const;
 export type TicketView = keyof typeof ticketViews;
@@ -49,7 +67,8 @@ export const statusHints: Record<TicketStatus, string> = {
 	in_progress: 'Being worked on',
 	pending: 'Waiting on the requester or someone else',
 	resolved: 'Fixed, pending confirmation',
-	closed: 'Done, no further action'
+	closed: 'Done, no further action',
+	raised_in_error: 'Not needed: a duplicate, mistake or test'
 };
 
 /** A ticket's reference as people see it, e.g. "TID-42". */

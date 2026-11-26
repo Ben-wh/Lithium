@@ -5,7 +5,7 @@
 	import Icon from '$lib/components/Icon.svelte';
 	import PriorityIcon from '$lib/components/PriorityIcon.svelte';
 	import StatusBadge from '$lib/components/StatusBadge.svelte';
-	import { statusLabels, ticketRef } from '$lib/tickets';
+	import { isDone, statusLabels, ticketRef } from '$lib/tickets';
 
 	let { data } = $props();
 	const prefix = $derived(data.settings.ticketPrefix);
@@ -77,7 +77,7 @@
 		for (const n of data.tree.nodes) if (!n.restricted) c.set(n.status, (c.get(n.status) ?? 0) + 1);
 		return (Object.keys(statusLabels) as TicketStatus[]).filter((s) => c.has(s)).map((s) => ({ status: s, n: c.get(s)! }));
 	});
-	const open = $derived(data.tree.nodes.filter((n) => !n.restricted && n.status !== 'resolved' && n.status !== 'closed').length);
+	const open = $derived(data.tree.nodes.filter((n) => !n.restricted && !isDone(n.status)).length);
 </script>
 
 <svelte:head>
@@ -118,7 +118,7 @@
 			<ul aria-label="Tickets in this incident">
 				{#each layout.nodes as n (n.id)}
 					{@const isRoot = n.id === layout.root.id}
-					{@const done = n.status === 'resolved' || n.status === 'closed'}
+					{@const done = isDone(n.status)}
 					<li class="absolute" style:left="{n.x}px" style:top="{n.y}px" style:width="{W}px" style:height="{H}px">
 						{#if n.restricted}
 							<div

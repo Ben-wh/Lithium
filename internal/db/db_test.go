@@ -187,3 +187,63 @@ func TestKBAdminVisibilityMigrationKeepsArticles(t *testing.T) {
 	}
 	mustExec(t, conn, `UPDATE kb_articles SET visibility = 'admins' WHERE id = 1`)
 }
+
+// Rebuilding tickets for the raised-in-error status keeps every column and
+// everything that points at a ticket (comments, attachments, child tickets).
+func TestRaisedInErrorMigrationKeepsTickets(t *testing.T) {
+	ctx := context.Background()
+	path := filepath.Join(t.TempDir(), "test.db")
+	old, err := sql.Open("sqlite", "file:"+path+"?_pragma=foreign_keys(ON)")
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := newProvider(old)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := p.UpTo(ctx, 23); err != nil {
+		t.Fatal(err)
+	}
+	mustExec(t, old, `INSERT INTO users (id, email, name, password_hash, role, created_at, updated_at) VALUES (1, 'a@example.com', 'A', 'x', 'admin', 0, 0)`)
+	mustExec(t, old, `INSERT INTO ticket_categories (id, name, created_at, updated_at) VALUES (1, 'Hardware', 0, 0)`)
+	mustExec(t, old, `INSERT INTO tickets (id, subject, description, status, requester_id, created_by, assignee_id, created_at, updated_at, category_id, custom_fields, template_name)
+		VALUES (1, 'Parent', 'd', 'pending', 1, 1, 1, 5, 6, 1, '[{"label":"Asset","value":"X1"}]', 'Laptop')`)
+	mustExec(t, old, `INSERT INTO tickets (id, subject, description, requester_id, created_by, created_at, updated_at, parent_id) VALUES (2, 'Child', 'd', 1, 1, 0, 0, 1)`)
+	mustExec(t, old, `INSERT INTO ticket_comments (ticket_id, kind, author_id, body, created_at) VALUES (1, 'comment', 1, 'hello', 0)`)
+	mustExec(t, old, `INSERT INTO ticket_attachments (ticket_id, filename, stored_name, content_type, size, uploaded_by, created_at) VALUES (1, 'a.png', 'x.png', 'image/png', 1, 1, 0)`)
+	if _, err := old.Exec(`UPDATE tickets SET status = 'raised_in_error' WHERE id = 1`); err == nil {
+		t.Fatal("raised_in_error accepted before the migration")
+	}
+	old.Close()
+
+	conn, err := Open(ctx, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+
+	var status, fields, tmpl string
+	var assignee, cat, created, updated int64
+	if err := conn.QueryRow(`SELECT status, assignee_id, category_id, created_at, updated_at, custom_fields, template_name FROM tickets WHERE id = 1`).
+		Scan(&status, &assignee, &cat, &created, &updated, &fields, &tmpl); err != nil {
+		t.Fatal(err)
+	}
+	if status != "pending" || assignee != 1 || cat != 1 || created != 5 || updated != 6 || tmpl != "Laptop" || fields == "[]" {
+		t.Fatalf("ticket changed: %s %d %d %d %d %s %s", status, assignee, cat, created, updated, fields, tmpl)
+	}
+	var n int
+	conn.QueryRow(`SELECT (SELECT COUNT(*) FROM ticket_comments) + (SELECT COUNT(*) FROM ticket_attachments) + (SELECT COUNT(*) FROM tickets WHERE parent_id = 1)`).Scan(&n)
+	if n != 3 {
+		t.Fatalf("comments/attachments/child link lost: %d of 3 left", n)
+	}
+	mustExec(t, conn, `UPDATE tickets SET status = 'raised_in_error' WHERE id = 1`)
+	if _, err := conn.Exec(`UPDATE tickets SET status = 'bogus' WHERE id = 1`); err == nil {
+		t.Fatal("unknown status accepted")
+	}
+	// Cascades still work against the rebuilt table.
+	mustExec(t, conn, `DELETE FROM tickets WHERE id = 1`)
+	conn.QueryRow(`SELECT COUNT(*) FROM ticket_comments`).Scan(&n)
+	if n != 0 {
+		t.Fatalf("comments not cascaded: %d", n)
+	}
+}

@@ -120,7 +120,7 @@
 				notice = { kind: 'success', text: `Saved “${name.trim()}”. New tickets use it straight away.` };
 			} else {
 				await adminTemplates.create(draft);
-				notice = { kind: 'success', text: `Added “${name.trim()}”. Link it to a category below to use it.` };
+				notice = { kind: 'success', text: `Added “${name.trim()}”. Link it to a category above to use it.` };
 			}
 			editorOpen = false;
 			await loadTemplates();
@@ -155,7 +155,7 @@
 	<div class="flex items-center justify-between gap-3 border-b border-ink-800 px-5 py-4">
 		<div>
 			<h3 class="text-sm font-semibold">Ticket templates</h3>
-			<p class="mt-0.5 text-sm text-ink-400">Extra questions for tickets in a category. Link a template to categories below.</p>
+			<p class="mt-0.5 text-sm text-ink-400">Extra questions for tickets in a category. Link a template to categories above.</p>
 		</div>
 		<button
 			type="button"

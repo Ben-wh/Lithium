@@ -219,7 +219,7 @@ func (s *Server) notifyComment(ctx context.Context, t store.Ticket, author store
 
 var statusNames = map[string]string{
 	"unassigned": "Unassigned", "in_progress": "In progress", "pending": "Pending",
-	"resolved": "Resolved", "closed": "Closed",
+	"resolved": "Resolved", "closed": "Closed", "raised_in_error": "Raised in error",
 }
 var priorityNames = map[string]string{"low": "Low", "normal": "Normal", "high": "High", "urgent": "Urgent"}
 

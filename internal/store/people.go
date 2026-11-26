@@ -32,7 +32,7 @@ func personQuery(scope TicketFilter, extraWhere string, extraArgs ...any) (strin
 	q := `
 		SELECT u.id, u.name, u.email, u.avatar, u.role, u.created_at,
 		       COUNT(t.id),
-		       COALESCE(SUM(t.status NOT IN ('resolved', 'closed')), 0),
+		       COALESCE(SUM(t.status NOT IN ` + doneStatuses + `), 0),
 		       MAX(t.created_at)
 		FROM users u
 		LEFT JOIN tickets t ON ` + join + `

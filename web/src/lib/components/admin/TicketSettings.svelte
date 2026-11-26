@@ -92,9 +92,12 @@
 	}
 </script>
 
-<div class="mt-5 rounded-xl border border-ink-800 bg-ink-900/60">
+<CategoryManager />
+<TemplateManager />
+
+<div class="mt-6 rounded-xl border border-ink-800 bg-ink-900/60">
 	<div class="flex items-center justify-between gap-3 border-b border-ink-800 px-5 py-4">
-		<h3 class="text-sm font-semibold">Raising tickets</h3>
+		<h3 class="text-sm font-semibold">Ticket settings</h3>
 		<span class="text-xs" aria-live="polite">
 			{#if saving}
 				<span class="text-ink-500">Saving…</span>
@@ -131,6 +134,18 @@
 				Allow image uploads to tickets
 				{#snippet description()}
 					Users can attach up to 5 images (PNG, JPG, GIF or WebP, 10 MB each) when they raise a ticket.
+				{/snippet}
+			</Toggle>
+			<div class="my-4 h-px bg-ink-800"></div>
+			<Toggle
+				bind:checked={settings.allowRequesterReopen}
+				disabled={saving}
+				onchange={(on) => save({ allowRequesterReopen: on }, () => settings && (settings.allowRequesterReopen = !on))}
+			>
+				Allow reporters to reopen their tickets
+				{#snippet description()}
+					People can reopen their own tickets once they're resolved, closed or raised in error. When this is off,
+					only agents and admins can reopen tickets, and reporters reply to ask instead.
 				{/snippet}
 			</Toggle>
 			<div class="my-4 h-px bg-ink-800"></div>
@@ -250,6 +265,3 @@
 		{/if}
 	</div>
 </div>
-
-<TemplateManager />
-<CategoryManager />

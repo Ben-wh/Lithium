@@ -23,7 +23,7 @@
 		type TicketChanges
 	} from '$lib/api';
 	import { dateTimeFmt, formatBytes, formatDate } from '$lib/format';
-	import { priorities, priorityLabel, statusHints, statusLabels, ticketRef } from '$lib/tickets';
+	import { isDone, priorities, priorityLabel, statusHints, statusLabels, ticketRef } from '$lib/tickets';
 
 	let { data } = $props();
 
@@ -63,6 +63,27 @@
 			changeError = errorText(err);
 		} finally {
 			saving = false;
+		}
+	}
+
+	// --- Reopening: the requester or staff, once a ticket is resolved or closed ---
+	const canReopen = $derived(
+		isDone(t.status) && (data.isStaff || (t.requester.id === me && data.settings.allowRequesterReopen))
+	);
+	let reopening = $state(false);
+	let reopenError = $state('');
+
+	async function reopen() {
+		reopening = true;
+		reopenError = '';
+		try {
+			t = await tickets.reopen(t.id);
+			comments = await tickets.comments(t.id);
+			if (data.isStaff) assignable = await tickets.assignable(t.id);
+		} catch (err) {
+			reopenError = errorText(err);
+		} finally {
+			reopening = false;
 		}
 	}
 
@@ -174,6 +195,27 @@
 		<StatusBadge status={t.status} />
 	</div>
 	<h1 class="mt-2 text-2xl font-semibold tracking-tight break-words">{t.subject}</h1>
+
+	{#if canReopen}
+		<div class="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-ink-800 bg-ink-900/60 px-4 py-3 text-sm">
+			<p class="min-w-0 flex-1 text-ink-300">
+				This ticket is {statusLabels[t.status].toLowerCase()}.
+				{t.requester.id === me ? 'Still having the problem? Reopen it and we’ll pick it up again.' : 'Reopen it to put it back in the queue.'}
+			</p>
+			<button
+				type="button"
+				onclick={reopen}
+				disabled={reopening}
+				class="inline-flex h-8 items-center gap-1.5 rounded-lg border border-ink-700 px-3 text-sm font-medium text-ink-100 transition hover:border-ink-500 disabled:opacity-50"
+			>
+				<Icon name="refresh" class="size-4" />
+				{reopening ? 'Reopening…' : 'Reopen ticket'}
+			</button>
+			{#if reopenError}
+				<p role="alert" class="w-full text-sm text-danger-300">{reopenError}</p>
+			{/if}
+		</div>
+	{/if}
 
 	<div class="mt-8 grid gap-6 lg:grid-cols-[1fr_300px]">
 		<div class="min-w-0 space-y-6">

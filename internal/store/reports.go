@@ -40,10 +40,19 @@ type Report struct {
 	ByAssignee []NamedCount `json:"byAssignee"` // active tickets
 }
 
-var reportStatuses = []string{"unassigned", "in_progress", "pending", "resolved", "closed"}
+var reportStatuses = []string{"unassigned", "in_progress", "pending", "resolved", "closed", "raised_in_error"}
 var reportPriorities = []string{"urgent", "high", "normal", "low"}
 
-func isActive(status string) bool { return status != "resolved" && status != "closed" }
+func isActive(status string) bool { return !IsDone(status) }
+
+// IsDone reports whether a ticket is finished: resolved, closed or raised in
+// error. Finished tickets leave the queue and can be reopened.
+func IsDone(status string) bool {
+	return status == "resolved" || status == "closed" || status == "raised_in_error"
+}
+
+// doneStatuses is IsDone as an SQL list.
+const doneStatuses = `('resolved', 'closed', 'raised_in_error')`
 
 func median(xs []float64) *float64 {
 	if len(xs) == 0 {
@@ -154,12 +163,12 @@ func (s *Store) BuildReport(ctx context.Context, scope TicketFilter, days int, l
 	r.ByAssignee = sortedCounts(assignees)
 
 	// Resolutions in the period: a status change into resolved/closed from an
-	// active status. Time to resolve runs from when the ticket was raised.
+	// active status. Raised in error doesn't count as resolving anything. Time to resolve runs from when the ticket was raised.
 	rows, err = s.db.QueryContext(ctx, `
 		SELECT c.created_at, t.created_at
 		FROM ticket_comments c JOIN tickets t ON t.id = c.ticket_id
 		WHERE c.kind = 'event' AND c.event = 'status'
-		  AND c.new_value IN ('resolved', 'closed') AND c.old_value NOT IN ('resolved', 'closed')
+		  AND c.new_value IN ('resolved', 'closed') AND c.old_value NOT IN `+doneStatuses+`
 		  AND c.created_at >= ?`+where, append([]any{from}, args...)...)
 	if err != nil {
 		return r, err

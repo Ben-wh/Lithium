@@ -208,3 +208,56 @@ func (s *Server) handleUpdateTicket(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, t)
 }
+
+// handleReopenTicket moves a resolved, closed or raised-in-error ticket back
+// into the queue.
+// Staff can always do it; the requester can too, e.g. when a fix didn't hold,
+// unless an admin has turned that off (AllowRequesterReopen). It
+// goes back to its assignee (In progress) if it has one, otherwise to
+// Unassigned, and is recorded and notified like any other status change.
+func (s *Server) handleReopenTicket(w http.ResponseWriter, r *http.Request) {
+	t, ok := s.visibleTicket(w, r)
+	if !ok {
+		return
+	}
+	actor := userFrom(r.Context())
+	if !isStaff(actor) {
+		if t.Requester.ID != actor.ID {
+			writeError(w, http.StatusForbidden, "only the requester or staff can reopen this ticket")
+			return
+		}
+		settings, err := s.store.Settings(r.Context())
+		if err != nil {
+			s.log.Error("get settings", "err", err)
+			writeError(w, http.StatusInternalServerError, "internal error")
+			return
+		}
+		if !settings.AllowRequesterReopen {
+			writeError(w, http.StatusForbidden, "reopening is turned off; reply to ask the team to reopen it")
+			return
+		}
+	}
+	if !store.IsDone(t.Status) {
+		writeError(w, http.StatusConflict, "this ticket is already open")
+		return
+	}
+	status := "unassigned"
+	if t.Assignee != nil {
+		status = "in_progress"
+	}
+	changes, err := s.store.UpdateTicket(r.Context(), t.ID, actor.ID, store.TicketUpdate{Status: &status})
+	if err != nil {
+		s.log.Error("reopen ticket", "err", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	t, err = s.store.TicketByID(r.Context(), t.ID)
+	if err != nil {
+		s.log.Error("get ticket", "err", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	s.log.Info("ticket reopened", "ticket_id", t.ID, "by", actor.ID)
+	s.notifyUpdate(r.Context(), t, actor, changes)
+	writeJSON(w, http.StatusOK, t)
+}

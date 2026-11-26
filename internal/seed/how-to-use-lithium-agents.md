@@ -37,6 +37,7 @@ Open a ticket to work on it. The panel on the right lets you change:
 | **Pending** | You're waiting on the requester or someone else |
 | **Resolved** | It's fixed and waiting for the requester to confirm |
 | **Closed** | It's done, with no further action |
+| **Raised in error** | It shouldn't have been raised, e.g. a duplicate, a mistake or a test. It isn't counted as resolved in Reports |
 
 - **Priority** and **Category**: correct them if the requester chose ones that don't fit. Changing the category can change which agents can see the ticket.
 

@@ -256,7 +256,7 @@
 				{/each}
 			</select>
 			{#if templateStore.loaded && templateStore.list.length === 0}
-				<p class="mt-1.5 text-xs text-ink-500">Create templates under Ticket templates above to ask for extra details.</p>
+				<p class="mt-1.5 text-xs text-ink-500">Create templates under Ticket templates below to ask for extra details.</p>
 			{/if}
 		</div>
 		<fieldset>

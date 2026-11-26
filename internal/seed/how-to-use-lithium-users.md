@@ -49,10 +49,11 @@ Every ticket has a reference like **TID-42**. Open **Tickets** to see yours. The
 | **Pending** | Waiting on you or someone else. Check for a reply |
 | **Resolved** | Fixed, waiting for you to confirm |
 | **Closed** | Done, no further action |
+| **Raised in error** | Not needed, e.g. a duplicate or a mistake |
 
 Open a ticket to see its details, who's looking after it, and the conversation. Write in the reply box at the bottom and press **Reply** (or Ctrl/⌘+Enter) to answer the team. If your workspace allows it, type **@** to mention someone on the ticket and notify them.
 
-If a resolved ticket isn't actually fixed, reply to say so and the team will pick it back up.
+If a ticket was marked resolved or closed but the problem's back, press **Reopen ticket** at the top of it (if your workspace allows it), and reply to say what's still wrong. If there's no Reopen button, just reply and the team will reopen it for you.
 
 ## Notifications
 

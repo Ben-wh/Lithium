@@ -245,6 +245,7 @@ func (s *Server) handleUserDirectory(w http.ResponseWriter, r *http.Request) {
 
 var validStatuses = map[string]bool{
 	"unassigned": true, "in_progress": true, "pending": true, "resolved": true, "closed": true,
+	"raised_in_error": true,
 }
 
 type ticketList struct {

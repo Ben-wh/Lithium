@@ -234,7 +234,7 @@ export const adminCategories = {
 
 export type UserRef = { id: number; name: string; email: string; avatarUrl: string };
 export type Priority = 'low' | 'normal' | 'high' | 'urgent';
-export type TicketStatus = 'unassigned' | 'in_progress' | 'pending' | 'resolved' | 'closed';
+export type TicketStatus = 'unassigned' | 'in_progress' | 'pending' | 'resolved' | 'closed' | 'raised_in_error';
 
 export type Ticket = {
 	id: number;
@@ -321,6 +321,8 @@ export const tickets = {
 	/** Staff only. Only the fields given change; null clears category/assignee. */
 	update: (id: number, changes: TicketChanges) =>
 		request<Ticket>(`/api/tickets/${id}`, { method: 'PATCH', body: JSON.stringify(changes) }),
+	/** Moves a resolved or closed ticket back into the queue. The requester or staff. */
+	reopen: (id: number) => request<Ticket>(`/api/tickets/${id}/reopen`, { method: 'POST', body: '{}' }),
 	comments: (id: number | string, f?: Fetch) => request<Comment[]>(`/api/tickets/${id}/comments`, {}, f),
 	/** Staff only: who can be assigned this ticket (filtered by agent groups when they're on). */
 	assignable: (id: number | string, f?: Fetch) => request<UserRef[]>(`/api/tickets/${id}/assignable`, {}, f),
@@ -403,6 +405,8 @@ export type Settings = {
 	requireCategory: boolean;
 	/** Users can attach images when raising a ticket. */
 	allowImageUploads: boolean;
+	/** Requesters can reopen their own finished tickets (staff always can). */
+	allowRequesterReopen: boolean;
 	/** Shown before ticket numbers: "TID" → "TID-42". */
 	ticketPrefix: string;
 	/** Users can't upload their own profile picture (the built-in ones still work). */

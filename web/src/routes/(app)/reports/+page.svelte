@@ -32,19 +32,20 @@
 	const tiles = $derived([
 		{ label: 'Raised', value: r.totals.raised.toLocaleString(), hint: `in the last ${r.days} days` },
 		{ label: 'Resolved', value: r.totals.resolved.toLocaleString(), hint: `in the last ${r.days} days` },
-		{ label: 'Open now', value: r.totals.open.toLocaleString(), hint: 'not yet resolved or closed' },
+		{ label: 'Open now', value: r.totals.open.toLocaleString(), hint: 'not yet resolved, closed or raised in error' },
 		{ label: 'First response', value: duration(r.totals.medianFirstResponseHours), hint: 'median, tickets raised in period' },
 		{ label: 'Time to resolve', value: duration(r.totals.medianResolutionHours), hint: 'median, resolved in period' }
 	]);
 
-	// Status parts take the categorical slots in a fixed order. Text inside a
-	// part is white, except dark on the yellow slot.
+	// The same hues as the status badges. Text inside a part is white, except
+	// dark on the light yellow and red parts.
 	const statusColors: Record<TicketStatus, string> = {
 		unassigned: 'var(--viz-1)',
 		in_progress: 'var(--viz-2)',
-		pending: 'var(--viz-3)',
-		resolved: 'var(--viz-4)',
-		closed: 'var(--viz-5)'
+		pending: 'var(--viz-4)',
+		resolved: 'var(--viz-3)',
+		closed: 'var(--color-ink-500)',
+		raised_in_error: 'var(--color-danger-400)'
 	};
 	const statusParts = $derived(
 		r.byStatus.map((s) => ({
@@ -52,7 +53,7 @@
 			label: statusLabels[s.key as TicketStatus],
 			value: s.count,
 			color: statusColors[s.key as TicketStatus],
-			ink: s.key === 'resolved' ? ('dark' as const) : ('light' as const)
+			ink: s.key === 'pending' || s.key === 'raised_in_error' ? ('dark' as const) : ('light' as const)
 		}))
 	);
 

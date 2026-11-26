@@ -42,6 +42,7 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		RequireCategory      *bool   `json:"requireCategory"`
 		AllowImageUploads    *bool   `json:"allowImageUploads"`
+		AllowRequesterReopen *bool   `json:"allowRequesterReopen"`
 		TicketPrefix         *string `json:"ticketPrefix"`
 		DisableCustomAvatars *bool   `json:"disableCustomAvatars"`
 		AllowUserMentions    *bool   `json:"allowUserMentions"`
@@ -107,6 +108,7 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 	st, err := s.store.UpdateSettings(r.Context(), store.SettingsUpdate{
 		RequireCategory:      req.RequireCategory,
 		AllowImageUploads:    req.AllowImageUploads,
+		AllowRequesterReopen: req.AllowRequesterReopen,
 		TicketPrefix:         req.TicketPrefix,
 		DisableCustomAvatars: req.DisableCustomAvatars,
 		AllowUserMentions:    req.AllowUserMentions,

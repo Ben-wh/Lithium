@@ -340,7 +340,7 @@ func (s *Store) TicketStats(ctx context.Context, viewerID int64, f TicketFilter)
 		SELECT COALESCE(SUM(t.status = 'unassigned'), 0),
 		       COALESCE(SUM(t.status = 'in_progress'), 0),
 		       COALESCE(SUM(t.status = 'pending'), 0),
-		       COALESCE(SUM(t.assignee_id = ? AND t.status NOT IN ('resolved', 'closed')), 0),
+		       COALESCE(SUM(t.assignee_id = ? AND t.status NOT IN `+doneStatuses+`), 0),
 		       COALESCE(SUM(t.status IN ('resolved', 'closed') AND t.updated_at >= ?), 0)
 		FROM tickets t `+where,
 		append([]any{viewerID, weekAgo}, args...)...).Scan(&st.Unassigned, &st.InProgress, &st.Pending, &st.AssignedToMe, &st.ResolvedThisWeek)

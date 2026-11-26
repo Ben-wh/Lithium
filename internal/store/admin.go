@@ -33,7 +33,7 @@ func (s *Store) ListUsers(ctx context.Context, q string) ([]AdminUser, error) {
 		SELECT `+userCols+`,
 		       EXISTS (SELECT 1 FROM password_reset_requests p WHERE p.user_id = u.id AND p.status = 'pending'),
 		       (SELECT COUNT(*) FROM tickets t WHERE t.requester_id = u.id),
-		       (SELECT COUNT(*) FROM tickets t WHERE t.assignee_id = u.id AND t.status NOT IN ('resolved', 'closed'))
+		       (SELECT COUNT(*) FROM tickets t WHERE t.assignee_id = u.id AND t.status NOT IN `+doneStatuses+`)
 		FROM users u
 		WHERE ? = '' OR u.name LIKE ? ESCAPE '\' OR u.email LIKE ? ESCAPE '\'
 		ORDER BY u.name COLLATE NOCASE, u.id

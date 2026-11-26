@@ -46,6 +46,7 @@ Under **Settings → Tickets**:
 - **Ticket templates**: ask for extra details on tickets in a category. A template can have instructions, a starting priority, and fields (short text, long text, number, dropdown, checkbox or date). Choose whether the description box is required, optional or hidden. Then link the template to categories.
 - **Mandatory category**: users must choose a category.
 - **Allow image uploads**: up to 5 images per ticket.
+- **Allow reporters to reopen their tickets**: people can reopen their own tickets once they're resolved, closed or raised in error. Agents and admins can always reopen tickets.
 - **Incident tree**: lets staff see a diagram of every ticket linked under an urgent ticket.
 - **Ticket ID prefix**: the letters before each ticket number, such as **TID**. Searching by an old prefix still works.
 - **Length limits**: the longest subject and description a new ticket can have.

@@ -16,6 +16,9 @@ type Settings struct {
 	RequireCategory bool `json:"requireCategory"`
 	// AllowImageUploads lets users attach images when raising a ticket.
 	AllowImageUploads bool `json:"allowImageUploads"`
+	// AllowRequesterReopen lets requesters reopen their own resolved, closed or
+	// raised-in-error tickets. Staff can always reopen.
+	AllowRequesterReopen bool `json:"allowRequesterReopen"`
 	// TicketPrefix is shown before ticket numbers, e.g. "TID" → "TID-42".
 	TicketPrefix string `json:"ticketPrefix"`
 	// DisableCustomAvatars stops users uploading their own profile picture
@@ -97,6 +100,7 @@ const (
 const (
 	keyRequireCategory      = "tickets.require_category"
 	keyAllowImageUploads    = "tickets.allow_image_uploads"
+	keyAllowRequesterReopen = "tickets.allow_requester_reopen"
 	keyTicketPrefix         = "tickets.id_prefix"
 	keyDisableCustomAvatars = "users.disable_custom_avatars"
 	keyAllowUserMentions    = "users.allow_user_mentions"
@@ -119,6 +123,7 @@ func DefaultSettings() Settings {
 	return Settings{
 		RequireCategory:      false,
 		AllowImageUploads:    true,
+		AllowRequesterReopen: true,
 		TicketPrefix:         "TID",
 		AllowUserMentions:    true,
 		SubjectMaxLength:     150,  // about one line, like an email subject
@@ -151,6 +156,8 @@ func (s *Store) Settings(ctx context.Context) (Settings, error) {
 			st.RequireCategory, _ = strconv.ParseBool(value)
 		case keyAllowImageUploads:
 			st.AllowImageUploads, _ = strconv.ParseBool(value)
+		case keyAllowRequesterReopen:
+			st.AllowRequesterReopen, _ = strconv.ParseBool(value)
 		case keyTicketPrefix:
 			st.TicketPrefix = value
 		case keyDisableCustomAvatars:
@@ -201,6 +208,7 @@ func (s *Store) Settings(ctx context.Context) (Settings, error) {
 type SettingsUpdate struct {
 	RequireCategory      *bool
 	AllowImageUploads    *bool
+	AllowRequesterReopen *bool
 	TicketPrefix         *string
 	DisableCustomAvatars *bool
 	AllowUserMentions    *bool
@@ -224,6 +232,9 @@ func (s *Store) UpdateSettings(ctx context.Context, u SettingsUpdate) (Settings,
 	}
 	if u.AllowImageUploads != nil {
 		values[keyAllowImageUploads] = strconv.FormatBool(*u.AllowImageUploads)
+	}
+	if u.AllowRequesterReopen != nil {
+		values[keyAllowRequesterReopen] = strconv.FormatBool(*u.AllowRequesterReopen)
 	}
 	if u.TicketPrefix != nil {
 		values[keyTicketPrefix] = *u.TicketPrefix
